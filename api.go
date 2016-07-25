@@ -66,7 +66,8 @@ func (api API) HandleListRepositories(context *gin.Context) {
 
 	repositories, err := ioutil.ReadDir(api.RepositoriesDir)
 	if err != nil {
-		response = api.getErrorResponse(err)
+		api.sendResponse(context, api.getErrorResponse(err))
+		return
 	}
 
 	for _, repository := range repositories {
@@ -91,7 +92,8 @@ func (api *API) HandleListEpoches(context *gin.Context) {
 
 	epoches, err := ioutil.ReadDir(repositoryDir)
 	if err != nil {
-		response = api.getErrorResponse(err)
+		api.sendResponse(context, api.getErrorResponse(err))
+		return
 	}
 
 	for _, epoch := range epoches {
@@ -111,16 +113,14 @@ func (api *API) HandleListPackages(context *gin.Context) {
 
 	repository, err := api.getRepository(context)
 	if err != nil {
-		api.sendResponse(
-			context,
-			api.getErrorResponse(err),
-		)
+		api.sendResponse(context, api.getErrorResponse(err))
 		return
 	}
 
 	response.Data[dataKeyPackages], err = repository.ListPackages()
 	if err != nil {
-		response = api.getErrorResponse(err)
+		api.sendResponse(context, api.getErrorResponse(err))
+		return
 	}
 
 	api.sendResponse(context, response)
@@ -134,10 +134,7 @@ func (api *API) HandleAddPackage(context *gin.Context) {
 
 	repository, err := api.getRepository(context)
 	if err != nil {
-		api.sendResponse(
-			context,
-			api.getErrorResponse(err),
-		)
+		api.sendResponse(context, api.getErrorResponse(err))
 		return
 	}
 
