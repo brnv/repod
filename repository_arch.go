@@ -66,10 +66,7 @@ func (arch *RepositoryArch) AddPackage(
 	}
 
 	cmd = exec.Command(
-		"repo-add",
-		"-s",
-		arch.getDatabaseFilePath(),
-		packageFilePath,
+		"repo-add", "-s", arch.getDatabaseFilePath(), packageFilePath,
 	)
 	_, _, err = executil.Run(cmd)
 	if err != nil {
