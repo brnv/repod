@@ -44,7 +44,7 @@ set -euo pipefail
 }
 
 curl() {
-    /bin/curl -s $1
+    /bin/curl -s ${@}
 }
 
 :curl-repositories-list() {
@@ -63,4 +63,16 @@ curl() {
     local architecture="$4"
 
     curl http://localhost:6333/v1/$repo/$epoch/$database/$architecture
+}
+
+:curl-add-package() {
+    local repo="$1"
+    local epoch="$2"
+    local database="$3"
+    local architecture="$4"
+    local package="$5"
+    local package_file="$6"
+
+    curl -F package_file=@$package_file -XPUT \
+        http://localhost:6333/v1/$repo/$epoch/$database/$architecture/$package
 }

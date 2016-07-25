@@ -37,6 +37,8 @@ const (
 
 	osArchLinux = 1
 	osUbuntu    = 2
+
+	formPackageFile = "package_file"
 )
 
 var (
@@ -107,14 +109,11 @@ func (api *API) HandleListPackages(context *gin.Context) {
 		response = defaultResponse
 	)
 
-	repository := api.getRepository(context)
-
-	if repository == nil {
+	repository, err := api.getRepository(context)
+	if err != nil {
 		api.sendResponse(
 			context,
-			api.getErrorResponse(
-				errors.New("can't detect repository os"),
-			),
+			api.getErrorResponse(err),
 		)
 		return
 	}
@@ -128,7 +127,44 @@ func (api *API) HandleListPackages(context *gin.Context) {
 }
 
 func (api *API) HandleAddPackage(context *gin.Context) {
-	api.sendResponse(context, defaultResponse)
+	var (
+		err      error
+		response = defaultResponse
+	)
+
+	repository, err := api.getRepository(context)
+	if err != nil {
+		api.sendResponse(
+			context,
+			api.getErrorResponse(err),
+		)
+		return
+	}
+
+	packageFile, packageFileHeader, err :=
+		context.Request.FormFile(formPackageFile)
+	if err != nil {
+		api.sendResponse(
+			context,
+			api.getErrorResponse(
+				errors.New("can't read package file form file"),
+			),
+		)
+		return
+	}
+
+	repositoryPackage := RepositoryPackage{
+		Name: packageFileHeader.Filename,
+		File: packageFile,
+	}
+
+	err = repository.AddPackage(repositoryPackage)
+	if err != nil {
+		api.sendResponse(context, api.getErrorResponse(err))
+		return
+	}
+
+	api.sendResponse(context, response)
 }
 
 func (api *API) HandleDeletePackage(context *gin.Context) {
@@ -164,7 +200,7 @@ func (api *API) getErrorResponse(err error) Response {
 	}
 }
 
-func (api *API) getRepository(context *gin.Context) Repository {
+func (api *API) getRepository(context *gin.Context) (Repository, error) {
 	repositoryDir := fmt.Sprintf(
 		formatRepositoryPath,
 		api.RepositoriesDir,
@@ -172,13 +208,13 @@ func (api *API) getRepository(context *gin.Context) Repository {
 	)
 
 	if api.RepositoryOS == osArchLinux {
-		return RepositoryArch{
+		return &RepositoryArch{
 			Path:         repositoryDir,
 			Epoch:        context.Param("epoch"),
 			Database:     context.Param("database"),
 			Architecture: context.Param("architecture"),
-		}
+		}, nil
 	}
 
-	return nil
+	return nil, fmt.Errorf("can't get repository from request")
 }

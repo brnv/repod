@@ -1,5 +1,9 @@
 package main
 
+import (
+	"io"
+)
+
 type Repository interface {
 	ListPackages() ([]string, error)
 	AddPackage(repositoryPackage RepositoryPackage) error
@@ -8,4 +12,7 @@ type Repository interface {
 	DescribePackage(repositoryPackage RepositoryPackage) error
 }
 
-type RepositoryPackage string
+type RepositoryPackage struct {
+	Name string
+	File io.Reader
+}
