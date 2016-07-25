@@ -52,11 +52,11 @@ var (
 func (api *API) DetectRepositoryOS(context *gin.Context) {
 	repository := context.Param("repository")
 
-	if strings.Contains(repository, "arch") {
+	if strings.HasPrefix(repository, "arch") {
 		api.RepositoryOS = osArchLinux
 	}
 
-	if strings.Contains(repository, "ubuntu") {
+	if strings.HasPrefix(repository, "ubuntu") {
 		api.RepositoryOS = osUbuntu
 	}
 }
