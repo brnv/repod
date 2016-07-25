@@ -16,11 +16,11 @@ Usage:
 	repod [--listen-address=<url>] [--repositories-dir=<path>]
 
 Options:
-    -h --help                   Show this help.
-    --listen-address=<url>      Address to listen requests to.
-                                 [default: :6333]
-    --repositories-dir=<path>   Host filesystem directory with repositories.
-                                 [default: /srv/http]
+    -h --help                  Show this help.
+    --listen-address=<url>     Address to listen requests to.
+                                [default: :6333]
+    --repositories-dir=<path>  Host filesystem directory with repositories.
+                                [default: /srv/http]
 `
 
 func main() {
