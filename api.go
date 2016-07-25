@@ -83,19 +83,19 @@ func (api *API) HandleListPackages(context *gin.Context) {
 
 }
 
-func (api *API) HandlePackageAdd(context *gin.Context) {
+func (api *API) HandleAddPackage(context *gin.Context) {
 
 }
 
-func (api *API) HandlePackageDelete(context *gin.Context) {
+func (api *API) HandleDeletePackage(context *gin.Context) {
 
 }
 
-func (api *API) HandlePackageEdit(context *gin.Context) {
+func (api *API) HandleEditPackage(context *gin.Context) {
 
 }
 
-func (api *API) HandlePackageDescribe(context *gin.Context) {
+func (api *API) HandleDescribePackage(context *gin.Context) {
 
 }
 

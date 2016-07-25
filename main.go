@@ -42,10 +42,10 @@ func main() {
 	v1.GET("/", api.HandleListRepositories)
 	v1.GET("/:repository/", api.HandleListEpoches)
 	v1.GET("/:repository/:epoch/", api.HandleListPackages)
-	v1.POST("/:repository/:epoch/", api.HandlePackageAdd)
-	v1.GET("/:repository/:epoch/:package", api.HandlePackageDescribe)
-	v1.DELETE("/:repository/:epoch/:package", api.HandlePackageDelete)
-	v1.POST("/:repository/:epoch/:package", api.HandlePackageEdit)
+	v1.PUT("/:repository/:epoch/:package", api.HandleAddPackage)
+	v1.GET("/:repository/:epoch/:package", api.HandleDescribePackage)
+	v1.DELETE("/:repository/:epoch/:package", api.HandleDeletePackage)
+	v1.POST("/:repository/:epoch/:package", api.HandleEditPackage)
 
 	router.Run(args["--listen-address"].(string))
 }
