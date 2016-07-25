@@ -153,12 +153,10 @@ func (api *API) HandleAddPackage(context *gin.Context) {
 		return
 	}
 
-	repositoryPackage := RepositoryPackage{
-		Name: packageFileHeader.Filename,
-		File: packageFile,
-	}
-
-	err = repository.AddPackage(repositoryPackage)
+	err = repository.AddPackage(
+		packageFileHeader.Filename,
+		packageFile,
+	)
 	if err != nil {
 		api.sendResponse(context, api.getErrorResponse(err))
 		return

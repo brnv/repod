@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"io/ioutil"
 	"os/exec"
 
@@ -40,15 +41,15 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 }
 
 func (arch *RepositoryArch) AddPackage(
-	repositoryPackage RepositoryPackage,
+	filename string, file io.Reader,
 ) error {
 	// check if this version were installed
 	// find and remove any other version of package
 	// put new version into backup dir
 
-	packageFilePath := arch.getPackagesPath() + "/" + repositoryPackage.Name
+	packageFilePath := arch.getPackagesPath() + "/" + filename
 
-	contentRaw, err := ioutil.ReadAll(repositoryPackage.File)
+	contentRaw, err := ioutil.ReadAll(file)
 	if err != nil {
 		return err
 	}
