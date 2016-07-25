@@ -26,6 +26,23 @@ set -euo pipefail
     done
 }
 
+:bootstrap-packages-arch() {
+    local repo="$1"
+    local epoch="$2"
+    local database="$3"
+    local architecture="$4"
+    shift 4
+
+    local packages=${@}
+
+    local testdir=$(tests:get-tmp-dir)
+    for package in $packages; do
+        dir=$testdir/repositories/$repo/$epoch/$database/$architecture
+        mkdir -p $dir
+        touch $dir/$package
+    done
+}
+
 curl() {
     /bin/curl -s $1
 }
@@ -37,4 +54,13 @@ curl() {
 :curl-epoches-list() {
     local repo="$1"
     curl http://localhost:6333/v1/$repo/
+}
+
+:curl-list-packages() {
+    local repo="$1"
+    local epoch="$2"
+    local database="$3"
+    local architecture="$4"
+
+    curl http://localhost:6333/v1/$repo/$epoch/$database/$architecture
 }

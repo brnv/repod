@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kovetskiy/toml"
@@ -12,6 +14,7 @@ import (
 
 type API struct {
 	RepositoriesDir string
+	RepositoryOS    int
 }
 
 type Response struct {
@@ -23,10 +26,17 @@ type Response struct {
 }
 
 const (
+	urlListPackages = "/:repository/:epoch/:database/:architecture"
+	urlPackage      = urlListPackages + "/:package"
+
 	dataKeyRepositories = "repositories"
 	dataKeyEpoches      = "epoches"
+	dataKeyPackages     = "packages"
 
 	formatRepositoryPath = "%s/%s/"
+
+	osArchLinux = 1
+	osUbuntu    = 2
 )
 
 var (
@@ -36,6 +46,18 @@ var (
 		Success: true,
 	}
 )
+
+func (api *API) DetectRepositoryOS(context *gin.Context) {
+	repository := context.Param("repository")
+
+	if strings.Contains(repository, "arch") {
+		api.RepositoryOS = osArchLinux
+	}
+
+	if strings.Contains(repository, "ubuntu") {
+		api.RepositoryOS = osUbuntu
+	}
+}
 
 func (api API) HandleListRepositories(context *gin.Context) {
 	response := defaultResponse
@@ -80,23 +102,45 @@ func (api *API) HandleListEpoches(context *gin.Context) {
 }
 
 func (api *API) HandleListPackages(context *gin.Context) {
+	var (
+		err      error
+		response = defaultResponse
+	)
 
+	repository := api.getRepository(context)
+
+	if repository == nil {
+		api.sendResponse(
+			context,
+			api.getErrorResponse(
+				errors.New("can't detect repository os"),
+			),
+		)
+		return
+	}
+
+	response.Data[dataKeyPackages], err = repository.ListPackages()
+	if err != nil {
+		response = api.getErrorResponse(err)
+	}
+
+	api.sendResponse(context, response)
 }
 
 func (api *API) HandleAddPackage(context *gin.Context) {
-
+	api.sendResponse(context, defaultResponse)
 }
 
 func (api *API) HandleDeletePackage(context *gin.Context) {
-
+	api.sendResponse(context, defaultResponse)
 }
 
 func (api *API) HandleEditPackage(context *gin.Context) {
-
+	api.sendResponse(context, defaultResponse)
 }
 
 func (api *API) HandleDescribePackage(context *gin.Context) {
-
+	api.sendResponse(context, defaultResponse)
 }
 
 func (api *API) sendResponse(
@@ -118,4 +162,23 @@ func (api *API) getErrorResponse(err error) Response {
 		Error:   err.Error(),
 		status:  http.StatusInternalServerError,
 	}
+}
+
+func (api *API) getRepository(context *gin.Context) Repository {
+	repositoryDir := fmt.Sprintf(
+		formatRepositoryPath,
+		api.RepositoriesDir,
+		context.Param("repository"),
+	)
+
+	if api.RepositoryOS == osArchLinux {
+		return RepositoryArch{
+			Path:         repositoryDir,
+			Epoch:        context.Param("epoch"),
+			Database:     context.Param("database"),
+			Architecture: context.Param("architecture"),
+		}
+	}
+
+	return nil
 }

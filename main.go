@@ -29,23 +29,27 @@ func main() {
 		panic(err)
 	}
 
-	api := API{
-		RepositoriesDir: args["--repositories-dir"].(string),
-	}
+	var (
+		repositoriesDir = args["--repositories-dir"].(string)
+		listenAddress   = args["--listen-address"].(string)
+	)
+
+	api := &API{RepositoriesDir: repositoriesDir}
 
 	router := gin.New()
 
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
+	router.Use(api.DetectRepositoryOS)
 
 	v1 := router.Group("/v1/")
 	v1.GET("/", api.HandleListRepositories)
 	v1.GET("/:repository/", api.HandleListEpoches)
-	v1.GET("/:repository/:epoch/", api.HandleListPackages)
-	v1.PUT("/:repository/:epoch/:package", api.HandleAddPackage)
-	v1.GET("/:repository/:epoch/:package", api.HandleDescribePackage)
-	v1.DELETE("/:repository/:epoch/:package", api.HandleDeletePackage)
-	v1.POST("/:repository/:epoch/:package", api.HandleEditPackage)
+	v1.GET(urlListPackages, api.HandleListPackages)
+	v1.PUT(urlPackage, api.HandleAddPackage)
+	v1.GET(urlPackage, api.HandleDescribePackage)
+	v1.DELETE(urlPackage, api.HandleDeletePackage)
+	v1.POST(urlPackage, api.HandleEditPackage)
 
-	router.Run(args["--listen-address"].(string))
+	router.Run(listenAddress)
 }
