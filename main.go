@@ -44,7 +44,7 @@ func main() {
 
 	v1 := router.Group("/v1/")
 	v1.GET("/", api.HandleListRepositories)
-	v1.GET("/:repository/", api.HandleListEpoches)
+	v1.GET("/:repo/", api.HandleListEpoches)
 	v1.GET(urlListPackages, api.HandleListPackages)
 	v1.PUT(urlPackage, api.HandleAddPackage)
 	v1.GET(urlPackage, api.HandleDescribePackage)

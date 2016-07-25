@@ -26,7 +26,7 @@ type Response struct {
 }
 
 const (
-	urlListPackages = "/:repository/:epoch/:database/:architecture"
+	urlListPackages = "/:repo/:epoch/:db/:arch"
 	urlPackage      = urlListPackages + "/:package"
 
 	dataKeyRepositories = "repositories"
@@ -50,7 +50,7 @@ var (
 )
 
 func (api *API) DetectRepositoryOS(context *gin.Context) {
-	repository := context.Param("repository")
+	repository := context.Param("repo")
 
 	if strings.HasPrefix(repository, "arch") {
 		api.RepositoryOS = osArchLinux
@@ -81,7 +81,7 @@ func (api API) HandleListRepositories(context *gin.Context) {
 func (api *API) HandleListEpoches(context *gin.Context) {
 	var (
 		response      = defaultResponse
-		repository    = context.Param("repository")
+		repository    = context.Param("repo")
 		repositoryDir = fmt.Sprintf(
 			formatRepositoryPath,
 			api.RepositoriesDir,
@@ -204,15 +204,15 @@ func (api *API) getRepository(context *gin.Context) (Repository, error) {
 	repositoryDir := fmt.Sprintf(
 		formatRepositoryPath,
 		api.RepositoriesDir,
-		context.Param("repository"),
+		context.Param("repo"),
 	)
 
 	if api.RepositoryOS == osArchLinux {
 		return &RepositoryArch{
 			Path:         repositoryDir,
 			Epoch:        context.Param("epoch"),
-			Database:     context.Param("database"),
-			Architecture: context.Param("architecture"),
+			Database:     context.Param("db"),
+			Architecture: context.Param("arch"),
 		}, nil
 	}
 
