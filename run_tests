@@ -7,11 +7,17 @@ source vendor/github.com/reconquest/import.bash/import.bash
 
 import:source "github.com/reconquest/test-runner.bash"
 
+:build() {
+    go build
+}
+
 :main() {
     trap :cleanup EXIT
     :cleanup() {
         :
     }
+
+    :build
 
     test-runner:run "${@}"
 }
