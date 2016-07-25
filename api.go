@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -10,7 +11,7 @@ import (
 )
 
 type API struct {
-	RepositoryDir string
+	RepositoriesDir string
 }
 
 type Response struct {
@@ -23,6 +24,9 @@ type Response struct {
 
 const (
 	dataKeyRepositories = "repositories"
+	dataKeyEpoches      = "epoches"
+
+	formatRepositoryPath = "%s/%s/"
 )
 
 var (
@@ -36,7 +40,7 @@ var (
 func (api API) HandleListRepositories(context *gin.Context) {
 	response := defaultResponse
 
-	repositories, err := ioutil.ReadDir(api.RepositoryDir)
+	repositories, err := ioutil.ReadDir(api.RepositoriesDir)
 	if err != nil {
 		response = api.getErrorResponse(err)
 	}
@@ -50,8 +54,29 @@ func (api API) HandleListRepositories(context *gin.Context) {
 	api.sendResponse(context, response)
 }
 
-func (api *API) HandleListEpochs(context *gin.Context) {
+func (api *API) HandleListEpoches(context *gin.Context) {
+	var (
+		response      = defaultResponse
+		repository    = context.Param("repository")
+		repositoryDir = fmt.Sprintf(
+			formatRepositoryPath,
+			api.RepositoriesDir,
+			repository,
+		)
+	)
 
+	epoches, err := ioutil.ReadDir(repositoryDir)
+	if err != nil {
+		response = api.getErrorResponse(err)
+	}
+
+	for _, epoch := range epoches {
+		response.Data[dataKeyEpoches] = append(
+			response.Data[dataKeyEpoches], epoch.Name(),
+		)
+	}
+
+	api.sendResponse(context, response)
 }
 
 func (api *API) HandleListPackages(context *gin.Context) {
