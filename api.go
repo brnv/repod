@@ -14,40 +14,43 @@ import (
 
 type API struct {
 	RepositoriesDir string
-	RepositoryOS    int
+	RepositoryOS    string
+	defaultResponse APIResponse
 }
 
-type Response struct {
+type APIResponse struct {
 	Success bool                `json:"success"`
 	Error   string              `json:"error"`
 	Data    map[string][]string `json:"data"`
-
-	status int
+	status  int
 }
 
 const (
 	urlListPackages = "/:repo/:epoch/:db/:arch"
 	urlPackage      = urlListPackages + "/:package"
 
-	dataKeyRepositories = "repositories"
-	dataKeyEpoches      = "epoches"
-	dataKeyPackages     = "packages"
+	responseKeyRepositories = "repositories"
+	responseKeyEpoches      = "epoches"
+	responseKeyPackages     = "packages"
 
 	formatRepositoryPath = "%s/%s/"
 
-	osArchLinux = 1
-	osUbuntu    = 2
+	osArchLinux = "arch"
+	osUbuntu    = "ubuntu"
 
 	formPackageFile = "package_file"
 )
 
-var (
-	defaultResponse = Response{
-		Data:    make(map[string][]string),
-		status:  http.StatusOK,
-		Success: true,
+func newAPI(repositoriesDir string) *API {
+	return &API{
+		RepositoriesDir: repositoriesDir,
+		defaultResponse: APIResponse{
+			Data:    make(map[string][]string),
+			status:  http.StatusOK,
+			Success: true,
+		},
 	}
-)
+}
 
 func (api *API) DetectRepositoryOS(context *gin.Context) {
 	repository := context.Param("repo")
@@ -62,7 +65,7 @@ func (api *API) DetectRepositoryOS(context *gin.Context) {
 }
 
 func (api API) HandleListRepositories(context *gin.Context) {
-	response := defaultResponse
+	response := api.defaultResponse
 
 	repositories, err := ioutil.ReadDir(api.RepositoriesDir)
 	if err != nil {
@@ -71,8 +74,8 @@ func (api API) HandleListRepositories(context *gin.Context) {
 	}
 
 	for _, repository := range repositories {
-		response.Data[dataKeyRepositories] = append(
-			response.Data[dataKeyRepositories], repository.Name(),
+		response.Data[responseKeyRepositories] = append(
+			response.Data[responseKeyRepositories], repository.Name(),
 		)
 	}
 
@@ -81,7 +84,7 @@ func (api API) HandleListRepositories(context *gin.Context) {
 
 func (api *API) HandleListEpoches(context *gin.Context) {
 	var (
-		response      = defaultResponse
+		response      = api.defaultResponse
 		repository    = context.Param("repo")
 		repositoryDir = fmt.Sprintf(
 			formatRepositoryPath,
@@ -97,8 +100,8 @@ func (api *API) HandleListEpoches(context *gin.Context) {
 	}
 
 	for _, epoch := range epoches {
-		response.Data[dataKeyEpoches] = append(
-			response.Data[dataKeyEpoches], epoch.Name(),
+		response.Data[responseKeyEpoches] = append(
+			response.Data[responseKeyEpoches], epoch.Name(),
 		)
 	}
 
@@ -108,7 +111,7 @@ func (api *API) HandleListEpoches(context *gin.Context) {
 func (api *API) HandleListPackages(context *gin.Context) {
 	var (
 		err      error
-		response = defaultResponse
+		response = api.defaultResponse
 	)
 
 	repository, err := api.getRepository(context)
@@ -117,7 +120,7 @@ func (api *API) HandleListPackages(context *gin.Context) {
 		return
 	}
 
-	response.Data[dataKeyPackages], err = repository.ListPackages()
+	response.Data[responseKeyPackages], err = repository.ListPackages()
 	if err != nil {
 		api.sendResponse(context, api.getErrorResponse(err))
 		return
@@ -129,7 +132,7 @@ func (api *API) HandleListPackages(context *gin.Context) {
 func (api *API) HandleAddPackage(context *gin.Context) {
 	var (
 		err      error
-		response = defaultResponse
+		response = api.defaultResponse
 	)
 
 	repository, err := api.getRepository(context)
@@ -163,19 +166,19 @@ func (api *API) HandleAddPackage(context *gin.Context) {
 }
 
 func (api *API) HandleDeletePackage(context *gin.Context) {
-	api.sendResponse(context, defaultResponse)
+	api.sendResponse(context, api.defaultResponse)
 }
 
 func (api *API) HandleEditPackage(context *gin.Context) {
-	api.sendResponse(context, defaultResponse)
+	api.sendResponse(context, api.defaultResponse)
 }
 
 func (api *API) HandleDescribePackage(context *gin.Context) {
-	api.sendResponse(context, defaultResponse)
+	api.sendResponse(context, api.defaultResponse)
 }
 
 func (api *API) sendResponse(
-	context *gin.Context, response Response,
+	context *gin.Context, response APIResponse,
 ) {
 	err := toml.NewEncoder(context.Writer).Encode(response)
 	if err != nil {
@@ -187,8 +190,8 @@ func (api *API) sendResponse(
 	context.Writer.WriteHeader(response.status)
 }
 
-func (api *API) getErrorResponse(err error) Response {
-	return Response{
+func (api *API) getErrorResponse(err error) APIResponse {
+	return APIResponse{
 		Success: false,
 		Error:   err.Error(),
 		status:  http.StatusInternalServerError,

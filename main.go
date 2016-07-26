@@ -32,11 +32,10 @@ func main() {
 	var (
 		repositoriesDir = args["--repositories-dir"].(string)
 		listenAddress   = args["--listen-address"].(string)
+
+		api    = newAPI(repositoriesDir)
+		router = gin.New()
 	)
-
-	api := &API{RepositoriesDir: repositoriesDir}
-
-	router := gin.New()
 
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
