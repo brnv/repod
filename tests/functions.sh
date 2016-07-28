@@ -8,25 +8,40 @@ set -euo pipefail
         --repositories-dir=$(tests:get-tmp-dir)/repositories/
 }
 
-:bootstrap-repositories() {
-    local repos=${@}
-    for repo in $repos; do
-        mkdir -p $(tests:get-tmp-dir)/repositories/$repo
-    done
-}
-
-:bootstrap-epoches() {
+:bootstrap-repository() {
     local repo="$1"
-    shift
+    local epoch="$2"
+    local database="$3"
+    local architecture="$4"
 
-    local epoches=${@}
-
-    for epoch in $epoches; do
-        mkdir -p $(tests:get-tmp-dir)/repositories/$repo/$epoch
-    done
+    local testdir=$(tests:get-tmp-dir)
+    local dir=$testdir/repositories/$repo/$epoch/$database/$architecture
+    mkdir -p $dir
 }
 
-:bootstrap-packages-arch() {
+curl() {
+    /bin/curl -s ${@}
+}
+
+:list-repositories() {
+    curl http://localhost:6333/v1/
+}
+
+:list-epoches() {
+    local repo="$1"
+    curl http://localhost:6333/v1/$repo/
+}
+
+:list-packages() {
+    local repo="$1"
+    local epoch="$2"
+    local database="$3"
+    local architecture="$4"
+
+    curl http://localhost:6333/v1/$repo/$epoch/$database/$architecture
+}
+
+:add-package() {
     local repo="$1"
     local epoch="$2"
     local database="$3"
@@ -36,43 +51,25 @@ set -euo pipefail
     local packages=${@}
 
     local testdir=$(tests:get-tmp-dir)
+    local dir=$testdir/repositories/$repo/$epoch/$database/$architecture
+
     for package in $packages; do
-        dir=$testdir/repositories/$repo/$epoch/$database/$architecture
-        mkdir -p $dir
-        touch $dir/$package
+        cp $testdir/PKGBUILD $dir/
+        PKGDEST=$dir PKGNAME=$package makepkg -p $testdir/PKGBUILD -c -f
+
+        curl -F \
+            package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz -XPUT \
+            http://localhost:6333/v1/$repo/$epoch/$database/$architecture/$package
     done
 }
 
-curl() {
-    /bin/curl -s ${@}
-}
-
-:curl-repositories-list() {
-    curl http://localhost:6333/v1/
-}
-
-:curl-epoches-list() {
-    local repo="$1"
-    curl http://localhost:6333/v1/$repo/
-}
-
-:curl-list-packages() {
-    local repo="$1"
-    local epoch="$2"
-    local database="$3"
-    local architecture="$4"
-
-    curl http://localhost:6333/v1/$repo/$epoch/$database/$architecture
-}
-
-:curl-add-package() {
+:remove-package() {
     local repo="$1"
     local epoch="$2"
     local database="$3"
     local architecture="$4"
     local package="$5"
-    local package_file="$6"
 
-    curl -F package_file=@$package_file -XPUT \
+    curl -XDELETE \
         http://localhost:6333/v1/$repo/$epoch/$database/$architecture/$package
 }

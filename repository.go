@@ -7,7 +7,7 @@ import (
 type Repository interface {
 	ListPackages() ([]string, error)
 	AddPackage(filename string, file io.Reader) error
-	DeletePackage(repositoryPackage RepositoryPackage) error
+	RemovePackage(filename string) error
 	EditPackage(repositoryPackage RepositoryPackage) error
 	DescribePackage(repositoryPackage RepositoryPackage) error
 }

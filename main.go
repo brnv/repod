@@ -47,7 +47,7 @@ func main() {
 	v1.GET(urlListPackages, api.HandleListPackages)
 	v1.PUT(urlPackage, api.HandleAddPackage)
 	v1.GET(urlPackage, api.HandleDescribePackage)
-	v1.DELETE(urlPackage, api.HandleDeletePackage)
+	v1.DELETE(urlPackage, api.HandleRemovePackage)
 	v1.POST(urlPackage, api.HandleEditPackage)
 
 	router.Run(listenAddress)

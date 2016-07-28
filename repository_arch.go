@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/kovetskiy/executil"
 )
@@ -15,6 +18,10 @@ type RepositoryArch struct {
 	Architecture string
 }
 
+const (
+	formatPacmanConfRepo = "[%s]"
+)
+
 func (arch RepositoryArch) getPackagesPath() string {
 	return arch.Path + "/" + arch.Epoch + "/" +
 		arch.Database + "/" + arch.Architecture
@@ -22,19 +29,52 @@ func (arch RepositoryArch) getPackagesPath() string {
 
 func (arch *RepositoryArch) getDatabaseFilePath() string {
 	return arch.getPackagesPath() + "/" +
-		arch.Database + "-" + arch.Epoch + ".db.tar.xz"
+		arch.getDatabaseFilename() + ".tar.xz"
+}
+
+func (arch *RepositoryArch) getDatabaseFilename() string {
+	return arch.getDatabaseName() + ".db"
+}
+
+func (arch *RepositoryArch) getDatabaseName() string {
+	return arch.Database + "-" + arch.Epoch
 }
 
 func (arch RepositoryArch) ListPackages() ([]string, error) {
-	packagesInfo, err := ioutil.ReadDir(arch.getPackagesPath())
+	tempDBDir, err := arch.getTmpPacmanDBDir()
 	if err != nil {
-		return []string{}, nil
+		return []string{}, err
 	}
 
-	packages := []string{}
+	tempConfig, err := arch.getTmpPacmanConfig()
+	if err != nil {
+		return []string{}, err
+	}
 
-	for _, packageInfo := range packagesInfo {
-		packages = append(packages, packageInfo.Name())
+	cmd := exec.Command(
+		"pacman",
+		"-Sl",
+		"--config",
+		tempConfig,
+		"-b",
+		tempDBDir,
+	)
+	pacmanPackagesRaw, _, err := executil.Run(cmd)
+	if err != nil {
+		return []string{}, err
+	}
+
+	var (
+		pacmanPackages = strings.Split(string(pacmanPackagesRaw), "\n")
+		packages       = []string{}
+	)
+	for _, pacmanPackage := range pacmanPackages {
+		if strings.Count(pacmanPackage, " ") >= 2 {
+			packages = append(
+				packages,
+				strings.Split(pacmanPackage, " ")[1],
+			)
+		}
 	}
 
 	return packages, nil
@@ -76,9 +116,17 @@ func (arch *RepositoryArch) AddPackage(
 	return nil
 }
 
-func (arch RepositoryArch) DeletePackage(
-	repositoryPackage RepositoryPackage,
-) error {
+func (arch RepositoryArch) RemovePackage(packageName string) error {
+	cmd := exec.Command(
+		"repo-remove", arch.getDatabaseFilePath(), packageName,
+	)
+	_, _, err := executil.Run(cmd)
+	if err != nil {
+		return err
+	}
+
+	// TODO: remove file from filesystem
+
 	return nil
 }
 
@@ -92,4 +140,45 @@ func (arch RepositoryArch) DescribePackage(
 	repositoryPackage RepositoryPackage,
 ) error {
 	return nil
+}
+
+func (arch *RepositoryArch) getTmpPacmanDBDir() (string, error) {
+	directory, err := ioutil.TempDir("/tmp/", "repod-")
+	if err != nil {
+		return "", err
+	}
+
+	err = os.Mkdir(directory+"/sync", 0777)
+	if err != nil {
+		return "", err
+	}
+
+	err = os.Symlink(
+		arch.getDatabaseFilePath(),
+		directory+"/sync/"+arch.getDatabaseFilename(),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	return directory, nil
+}
+
+func (arch *RepositoryArch) getTmpPacmanConfig() (string, error) {
+	config, err := ioutil.TempFile("/tmp/", "repod-")
+	if err != nil {
+		return "", err
+	}
+
+	err = ioutil.WriteFile(
+		config.Name(),
+		[]byte(fmt.Sprintf(formatPacmanConfRepo, arch.getDatabaseName())),
+		0644,
+	)
+
+	if err != nil {
+		return "", err
+	}
+
+	return config.Name(), nil
 }

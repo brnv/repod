@@ -165,8 +165,28 @@ func (api *API) HandleAddPackage(context *gin.Context) {
 	api.sendResponse(context, response)
 }
 
-func (api *API) HandleDeletePackage(context *gin.Context) {
-	api.sendResponse(context, api.defaultResponse)
+func (api *API) HandleRemovePackage(context *gin.Context) {
+	var (
+		err         error
+		response    = api.defaultResponse
+		packageName = context.Param("package")
+	)
+
+	repository, err := api.getRepository(context)
+	if err != nil {
+		api.sendResponse(context, api.getErrorResponse(err))
+		return
+	}
+
+	err = repository.RemovePackage(
+		packageName,
+	)
+	if err != nil {
+		api.sendResponse(context, api.getErrorResponse(err))
+		return
+	}
+
+	api.sendResponse(context, response)
 }
 
 func (api *API) HandleEditPackage(context *gin.Context) {

@@ -1,0 +1,23 @@
+pkgname="${PKGNAME:-}"
+pkgver=${PKGVER:-1}
+pkgrel=${PKGREL:-1}
+pkgdesc=""
+arch=('i686' 'x86_64')
+license=('GPL')
+md5sums=('SKIP')
+depends=()
+makedepends=(
+)
+backup=()
+branch=${BRANCH:-master}
+source=(
+    "PKGBUILD"
+)
+
+build() {
+	true
+}
+
+package() {
+	true
+}
