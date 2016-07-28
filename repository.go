@@ -6,13 +6,8 @@ import (
 
 type Repository interface {
 	ListPackages() ([]string, error)
-	AddPackage(filename string, file io.Reader) error
-	RemovePackage(filename string) error
-	EditPackage(repositoryPackage RepositoryPackage) error
-	DescribePackage(repositoryPackage RepositoryPackage) error
-}
-
-type RepositoryPackage struct {
-	Name string
-	File io.Reader
+	AddPackage(packageName string, file io.Reader) error
+	RemovePackage(packageName string) error
+	EditPackage(packageName string) error
+	DescribePackage(packageName string) error
 }

@@ -64,7 +64,7 @@ func (api *API) DetectRepositoryOS(context *gin.Context) {
 	}
 }
 
-func (api API) HandleListRepositories(context *gin.Context) {
+func (api API) handleListRepositories(context *gin.Context) {
 	response := api.defaultResponse
 
 	repositories, err := ioutil.ReadDir(api.RepositoriesDir)
@@ -82,7 +82,7 @@ func (api API) HandleListRepositories(context *gin.Context) {
 	api.sendResponse(context, response)
 }
 
-func (api *API) HandleListEpoches(context *gin.Context) {
+func (api *API) handleListEpoches(context *gin.Context) {
 	var (
 		response      = api.defaultResponse
 		repository    = context.Param("repo")
@@ -108,7 +108,7 @@ func (api *API) HandleListEpoches(context *gin.Context) {
 	api.sendResponse(context, response)
 }
 
-func (api *API) HandleListPackages(context *gin.Context) {
+func (api *API) handleListPackages(context *gin.Context) {
 	var (
 		err      error
 		response = api.defaultResponse
@@ -129,10 +129,11 @@ func (api *API) HandleListPackages(context *gin.Context) {
 	api.sendResponse(context, response)
 }
 
-func (api *API) HandleAddPackage(context *gin.Context) {
+func (api *API) handleAddPackage(context *gin.Context) {
 	var (
 		err      error
 		response = api.defaultResponse
+		request  = context.Request
 	)
 
 	repository, err := api.getRepository(context)
@@ -141,8 +142,7 @@ func (api *API) HandleAddPackage(context *gin.Context) {
 		return
 	}
 
-	packageFile, packageFileHeader, err :=
-		context.Request.FormFile(formPackageFile)
+	file, fileHeader, err := request.FormFile(formPackageFile)
 	if err != nil {
 		api.sendResponse(
 			context,
@@ -153,10 +153,7 @@ func (api *API) HandleAddPackage(context *gin.Context) {
 		return
 	}
 
-	err = repository.AddPackage(
-		packageFileHeader.Filename,
-		packageFile,
-	)
+	err = repository.AddPackage(fileHeader.Filename, file)
 	if err != nil {
 		api.sendResponse(context, api.getErrorResponse(err))
 		return
@@ -165,7 +162,7 @@ func (api *API) HandleAddPackage(context *gin.Context) {
 	api.sendResponse(context, response)
 }
 
-func (api *API) HandleRemovePackage(context *gin.Context) {
+func (api *API) handleRemovePackage(context *gin.Context) {
 	var (
 		err         error
 		response    = api.defaultResponse
@@ -178,9 +175,7 @@ func (api *API) HandleRemovePackage(context *gin.Context) {
 		return
 	}
 
-	err = repository.RemovePackage(
-		packageName,
-	)
+	err = repository.RemovePackage(packageName)
 	if err != nil {
 		api.sendResponse(context, api.getErrorResponse(err))
 		return
@@ -189,11 +184,11 @@ func (api *API) HandleRemovePackage(context *gin.Context) {
 	api.sendResponse(context, response)
 }
 
-func (api *API) HandleEditPackage(context *gin.Context) {
+func (api *API) handleEditPackage(context *gin.Context) {
 	api.sendResponse(context, api.defaultResponse)
 }
 
-func (api *API) HandleDescribePackage(context *gin.Context) {
+func (api *API) handleDescribePackage(context *gin.Context) {
 	api.sendResponse(context, api.defaultResponse)
 }
 

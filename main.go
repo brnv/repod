@@ -42,13 +42,13 @@ func main() {
 	router.Use(api.DetectRepositoryOS)
 
 	v1 := router.Group("/v1/")
-	v1.GET("/", api.HandleListRepositories)
-	v1.GET("/:repo/", api.HandleListEpoches)
-	v1.GET(urlListPackages, api.HandleListPackages)
-	v1.PUT(urlPackage, api.HandleAddPackage)
-	v1.GET(urlPackage, api.HandleDescribePackage)
-	v1.DELETE(urlPackage, api.HandleRemovePackage)
-	v1.POST(urlPackage, api.HandleEditPackage)
+	v1.GET("/", api.handleListRepositories)
+	v1.GET("/:repo/", api.handleListEpoches)
+	v1.GET(urlListPackages, api.handleListPackages)
+	v1.PUT(urlPackage, api.handleAddPackage)
+	v1.GET(urlPackage, api.handleDescribePackage)
+	v1.DELETE(urlPackage, api.handleRemovePackage)
+	v1.POST(urlPackage, api.handleEditPackage)
 
 	router.Run(listenAddress)
 }

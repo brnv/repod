@@ -22,31 +22,13 @@ const (
 	formatPacmanConfRepo = "[%s]"
 )
 
-func (arch RepositoryArch) getPackagesPath() string {
-	return arch.Path + "/" + arch.Epoch + "/" +
-		arch.Database + "/" + arch.Architecture
-}
-
-func (arch *RepositoryArch) getDatabaseFilePath() string {
-	return arch.getPackagesPath() + "/" +
-		arch.getDatabaseFilename() + ".tar.xz"
-}
-
-func (arch *RepositoryArch) getDatabaseFilename() string {
-	return arch.getDatabaseName() + ".db"
-}
-
-func (arch *RepositoryArch) getDatabaseName() string {
-	return arch.Database + "-" + arch.Epoch
-}
-
 func (arch RepositoryArch) ListPackages() ([]string, error) {
-	tempDBDir, err := arch.getTmpPacmanDBDir()
+	directory, err := arch.getTmpPacmanDBDir()
 	if err != nil {
 		return []string{}, err
 	}
 
-	tempConfig, err := arch.getTmpPacmanConfig()
+	config, err := arch.getTmpPacmanConfig()
 	if err != nil {
 		return []string{}, err
 	}
@@ -55,9 +37,9 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 		"pacman",
 		"-Sl",
 		"--config",
-		tempConfig,
+		config,
 		"-b",
-		tempDBDir,
+		directory,
 	)
 	pacmanPackagesRaw, _, err := executil.Run(cmd)
 	if err != nil {
@@ -69,7 +51,7 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 		packages       = []string{}
 	)
 	for _, pacmanPackage := range pacmanPackages {
-		if strings.Count(pacmanPackage, " ") >= 2 {
+		if strings.Count(pacmanPackage, " ") > 1 {
 			packages = append(
 				packages,
 				strings.Split(pacmanPackage, " ")[1],
@@ -81,15 +63,15 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 }
 
 func (arch *RepositoryArch) AddPackage(
-	filename string, file io.Reader,
+	packageName string, packageFile io.Reader,
 ) error {
 	// check if this version were installed
 	// find and remove any other version of package
 	// put new version into backup dir
 
-	packageFilePath := arch.getPackagesPath() + "/" + filename
+	packageFilePath := arch.getPackagesPath() + "/" + packageName
 
-	contentRaw, err := ioutil.ReadAll(file)
+	contentRaw, err := ioutil.ReadAll(packageFile)
 	if err != nil {
 		return err
 	}
@@ -130,16 +112,30 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 	return nil
 }
 
-func (arch RepositoryArch) EditPackage(
-	repositoryPackage RepositoryPackage,
-) error {
+func (arch RepositoryArch) EditPackage(packageName string) error {
 	return nil
 }
 
-func (arch RepositoryArch) DescribePackage(
-	repositoryPackage RepositoryPackage,
-) error {
+func (arch RepositoryArch) DescribePackage(packageName string) error {
 	return nil
+}
+
+func (arch *RepositoryArch) getDatabaseName() string {
+	return arch.Database + "-" + arch.Epoch
+}
+
+func (arch *RepositoryArch) getDatabaseFilename() string {
+	return arch.getDatabaseName() + ".db"
+}
+
+func (arch *RepositoryArch) getDatabaseFilePath() string {
+	return arch.getPackagesPath() + "/" +
+		arch.getDatabaseFilename() + ".tar.xz"
+}
+
+func (arch RepositoryArch) getPackagesPath() string {
+	return arch.Path + "/" + arch.Epoch + "/" +
+		arch.Database + "/" + arch.Architecture
 }
 
 func (arch *RepositoryArch) getTmpPacmanDBDir() (string, error) {
