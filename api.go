@@ -13,8 +13,9 @@ import (
 )
 
 type API struct {
-	RepositoriesDir string
-	RepositoryOS    string
+	repositoriesDir string
+	repositoryOS    string
+
 	defaultResponse APIResponse
 }
 
@@ -22,28 +23,27 @@ type APIResponse struct {
 	Success bool                `json:"success"`
 	Error   string              `json:"error"`
 	Data    map[string][]string `json:"data"`
-	status  int
+
+	status int
 }
 
 const (
 	urlListPackages = "/:repo/:epoch/:db/:arch"
 	urlPackage      = urlListPackages + "/:package"
 
-	responseKeyRepositories = "repositories"
-	responseKeyEpoches      = "epoches"
-	responseKeyPackages     = "packages"
-
-	formatRepositoryPath = "%s/%s/"
+	sliceKeyRepositories = "repositories"
+	sliceKeyEpoches      = "epoches"
+	sliceKeyPackages     = "packages"
 
 	osArchLinux = "arch"
 	osUbuntu    = "ubuntu"
 
-	formPackageFile = "package_file"
+	postFormPackageFile = "package_file"
 )
 
 func newAPI(repositoriesDir string) *API {
 	return &API{
-		RepositoriesDir: repositoriesDir,
+		repositoriesDir: repositoriesDir,
 		defaultResponse: APIResponse{
 			Data:    make(map[string][]string),
 			status:  http.StatusOK,
@@ -52,30 +52,30 @@ func newAPI(repositoriesDir string) *API {
 	}
 }
 
-func (api *API) DetectRepositoryOS(context *gin.Context) {
+func (api *API) detectRepositoryOS(context *gin.Context) {
 	repository := context.Param("repo")
 
 	if strings.HasPrefix(repository, "arch") {
-		api.RepositoryOS = osArchLinux
+		api.repositoryOS = osArchLinux
 	}
 
 	if strings.HasPrefix(repository, "ubuntu") {
-		api.RepositoryOS = osUbuntu
+		api.repositoryOS = osUbuntu
 	}
 }
 
 func (api API) handleListRepositories(context *gin.Context) {
 	response := api.defaultResponse
 
-	repositories, err := ioutil.ReadDir(api.RepositoriesDir)
+	repositories, err := ioutil.ReadDir(api.repositoriesDir)
 	if err != nil {
 		api.sendResponse(context, api.getErrorResponse(err))
 		return
 	}
 
 	for _, repository := range repositories {
-		response.Data[responseKeyRepositories] = append(
-			response.Data[responseKeyRepositories], repository.Name(),
+		response.Data[sliceKeyRepositories] = append(
+			response.Data[sliceKeyRepositories], repository.Name(),
 		)
 	}
 
@@ -85,12 +85,7 @@ func (api API) handleListRepositories(context *gin.Context) {
 func (api *API) handleListEpoches(context *gin.Context) {
 	var (
 		response      = api.defaultResponse
-		repository    = context.Param("repo")
-		repositoryDir = fmt.Sprintf(
-			formatRepositoryPath,
-			api.RepositoriesDir,
-			repository,
-		)
+		repositoryDir = api.repositoriesDir + "/" + context.Param("repo")
 	)
 
 	epoches, err := ioutil.ReadDir(repositoryDir)
@@ -100,8 +95,8 @@ func (api *API) handleListEpoches(context *gin.Context) {
 	}
 
 	for _, epoch := range epoches {
-		response.Data[responseKeyEpoches] = append(
-			response.Data[responseKeyEpoches], epoch.Name(),
+		response.Data[sliceKeyEpoches] = append(
+			response.Data[sliceKeyEpoches], epoch.Name(),
 		)
 	}
 
@@ -114,13 +109,13 @@ func (api *API) handleListPackages(context *gin.Context) {
 		response = api.defaultResponse
 	)
 
-	repository, err := api.getRepository(context)
+	repository, err := api.newRepository(context)
 	if err != nil {
 		api.sendResponse(context, api.getErrorResponse(err))
 		return
 	}
 
-	response.Data[responseKeyPackages], err = repository.ListPackages()
+	response.Data[sliceKeyPackages], err = repository.ListPackages()
 	if err != nil {
 		api.sendResponse(context, api.getErrorResponse(err))
 		return
@@ -136,13 +131,13 @@ func (api *API) handleAddPackage(context *gin.Context) {
 		request  = context.Request
 	)
 
-	repository, err := api.getRepository(context)
+	repository, err := api.newRepository(context)
 	if err != nil {
 		api.sendResponse(context, api.getErrorResponse(err))
 		return
 	}
 
-	file, fileHeader, err := request.FormFile(formPackageFile)
+	file, fileHeader, err := request.FormFile(postFormPackageFile)
 	if err != nil {
 		api.sendResponse(
 			context,
@@ -169,7 +164,7 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 		packageName = context.Param("package")
 	)
 
-	repository, err := api.getRepository(context)
+	repository, err := api.newRepository(context)
 	if err != nil {
 		api.sendResponse(context, api.getErrorResponse(err))
 		return
@@ -213,19 +208,14 @@ func (api *API) getErrorResponse(err error) APIResponse {
 	}
 }
 
-func (api *API) getRepository(context *gin.Context) (Repository, error) {
-	repositoryDir := fmt.Sprintf(
-		formatRepositoryPath,
-		api.RepositoriesDir,
-		context.Param("repo"),
-	)
-
-	if api.RepositoryOS == osArchLinux {
+func (api *API) newRepository(context *gin.Context) (Repository, error) {
+	switch api.repositoryOS {
+	case osArchLinux:
 		return &RepositoryArch{
-			Path:         repositoryDir,
-			Epoch:        context.Param("epoch"),
-			Database:     context.Param("db"),
-			Architecture: context.Param("arch"),
+			path:         api.repositoriesDir + "/" + context.Param("repo"),
+			epoch:        context.Param("epoch"),
+			database:     context.Param("db"),
+			architecture: context.Param("arch"),
 		}, nil
 	}
 

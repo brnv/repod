@@ -2,10 +2,12 @@
 
 set -euo pipefail
 
+api_url="http://localhost:6333/v1"
+
 :run() {
     PATH=$PATH:$(tests:get-tmp-dir)/bin repod \
-        --listen-address=":6333" \
-        --repositories-dir=$(tests:get-tmp-dir)/repositories/
+        --listen=":6333" \
+        --repos-dir=$(tests:get-tmp-dir)/repositories/
 }
 
 :bootstrap-repository() {
@@ -16,6 +18,7 @@ set -euo pipefail
 
     local testdir=$(tests:get-tmp-dir)
     local dir=$testdir/repositories/$repo/$epoch/$database/$architecture
+
     mkdir -p $dir
 }
 
@@ -24,12 +27,13 @@ curl() {
 }
 
 :list-repositories() {
-    curl http://localhost:6333/v1/
+    curl $api_url/
 }
 
 :list-epoches() {
     local repo="$1"
-    curl http://localhost:6333/v1/$repo/
+
+    curl $api_url/$repo/
 }
 
 :list-packages() {
@@ -38,7 +42,7 @@ curl() {
     local database="$3"
     local architecture="$4"
 
-    curl http://localhost:6333/v1/$repo/$epoch/$database/$architecture
+    curl $api_url/$repo/$epoch/$database/$architecture
 }
 
 :add-package() {
@@ -55,11 +59,13 @@ curl() {
 
     for package in $packages; do
         cp $testdir/PKGBUILD $dir/
-        PKGDEST=$dir PKGNAME=$package makepkg -p $testdir/PKGBUILD -c -f
+
+        PKGDEST=$dir PKGNAME=$package \
+            makepkg -p $testdir/PKGBUILD --clean --force
 
         curl -F \
             package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz -XPUT \
-            http://localhost:6333/v1/$repo/$epoch/$database/$architecture/$package
+            $api_url/$repo/$epoch/$database/$architecture/$package
     done
 }
 
@@ -71,5 +77,5 @@ curl() {
     local package="$5"
 
     curl -XDELETE \
-        http://localhost:6333/v1/$repo/$epoch/$database/$architecture/$package
+        $api_url/$repo/$epoch/$database/$architecture/$package
 }

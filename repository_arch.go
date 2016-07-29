@@ -12,10 +12,10 @@ import (
 )
 
 type RepositoryArch struct {
-	Path         string
-	Epoch        string
-	Database     string
-	Architecture string
+	path         string
+	epoch        string
+	database     string
+	architecture string
 }
 
 const (
@@ -23,7 +23,13 @@ const (
 )
 
 func (arch RepositoryArch) ListPackages() ([]string, error) {
-	directory, err := arch.getTmpPacmanDBDir()
+	directory, err := arch.getTmpDirectory()
+	if err != nil {
+		return []string{}, err
+	}
+	defer os.RemoveAll(directory)
+
+	err = arch.prepareSyncDirectory(directory)
 	if err != nil {
 		return []string{}, err
 	}
@@ -32,29 +38,28 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 	if err != nil {
 		return []string{}, err
 	}
+	defer os.RemoveAll(config)
 
 	cmd := exec.Command(
-		"pacman",
-		"-Sl",
-		"--config",
-		config,
-		"-b",
-		directory,
+		"pacman", "--sync", "--list",
+		"--config", config,
+		"--dbpath", directory,
 	)
-	pacmanPackagesRaw, _, err := executil.Run(cmd)
+	pacmanOutput, _, err := executil.Run(cmd)
 	if err != nil {
 		return []string{}, err
 	}
 
 	var (
-		pacmanPackages = strings.Split(string(pacmanPackagesRaw), "\n")
-		packages       = []string{}
+		outputLines = strings.Split(string(pacmanOutput), "\n")
+		packages    = []string{}
 	)
-	for _, pacmanPackage := range pacmanPackages {
-		if strings.Count(pacmanPackage, " ") > 1 {
+	for _, outputLine := range outputLines {
+		// outputLine example: "testing-db-testing package_name 1-1"
+		if strings.Count(outputLine, " ") > 1 {
 			packages = append(
 				packages,
-				strings.Split(pacmanPackage, " ")[1],
+				strings.Split(outputLine, " ")[1],
 			)
 		}
 	}
@@ -121,7 +126,7 @@ func (arch RepositoryArch) DescribePackage(packageName string) error {
 }
 
 func (arch *RepositoryArch) getDatabaseName() string {
-	return arch.Database + "-" + arch.Epoch
+	return arch.database + "-" + arch.epoch
 }
 
 func (arch *RepositoryArch) getDatabaseFilename() string {
@@ -134,25 +139,12 @@ func (arch *RepositoryArch) getDatabaseFilePath() string {
 }
 
 func (arch RepositoryArch) getPackagesPath() string {
-	return arch.Path + "/" + arch.Epoch + "/" +
-		arch.Database + "/" + arch.Architecture
+	return arch.path + "/" + arch.epoch + "/" +
+		arch.database + "/" + arch.architecture
 }
 
-func (arch *RepositoryArch) getTmpPacmanDBDir() (string, error) {
+func (arch *RepositoryArch) getTmpDirectory() (string, error) {
 	directory, err := ioutil.TempDir("/tmp/", "repod-")
-	if err != nil {
-		return "", err
-	}
-
-	err = os.Mkdir(directory+"/sync", 0777)
-	if err != nil {
-		return "", err
-	}
-
-	err = os.Symlink(
-		arch.getDatabaseFilePath(),
-		directory+"/sync/"+arch.getDatabaseFilename(),
-	)
 	if err != nil {
 		return "", err
 	}
@@ -160,8 +152,27 @@ func (arch *RepositoryArch) getTmpPacmanDBDir() (string, error) {
 	return directory, nil
 }
 
+func (arch *RepositoryArch) prepareSyncDirectory(directory string) error {
+	syncDirectoryPath := directory + "/sync"
+
+	err := os.Mkdir(syncDirectoryPath, 0777)
+	if err != nil {
+		return err
+	}
+
+	err = os.Symlink(
+		arch.getDatabaseFilePath(),
+		syncDirectoryPath+"/"+arch.getDatabaseFilename(),
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (arch *RepositoryArch) getTmpPacmanConfig() (string, error) {
-	config, err := ioutil.TempFile("/tmp/", "repod-")
+	config, err := ioutil.TempFile("/tmp/", "repod-pacman-config-")
 	if err != nil {
 		return "", err
 	}

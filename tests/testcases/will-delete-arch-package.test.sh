@@ -17,8 +17,7 @@ actual=$(:list-packages arch-repo testing testing-db x86_64)
 tests:assert-equals "$actual" "$expected"
 tests:assert-success
 
-:remove-package arch-repo testing testing-db x86_64 \
-    package_one
+:remove-package arch-repo testing testing-db x86_64 package_one
 
 expected='Success = true
 Error = ""

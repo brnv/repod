@@ -13,14 +13,14 @@ Required. TODO.
 
 Usage:
 	repod -h | --help
-	repod [--listen-address=<url>] [--repositories-dir=<path>]
+	repod [--listen=<url>] [--repos-dir=<path>]
 
 Options:
-    -h --help                  Show this help.
-    --listen-address=<url>     Address to listen requests to.
-                                [default: :6333]
-    --repositories-dir=<path>  Host filesystem directory with repositories.
-                                [default: /srv/http]
+    -h --help           Show this help.
+    --listen=<url>      Address to listen requests to.
+                         [default: :6333]
+    --repos-dir=<path>  Specify directory where repos stored.
+                         [default: /srv/http]
 `
 
 func main() {
@@ -30,8 +30,8 @@ func main() {
 	}
 
 	var (
-		repositoriesDir = args["--repositories-dir"].(string)
-		listenAddress   = args["--listen-address"].(string)
+		repositoriesDir = args["--repos-dir"].(string)
+		listenAddress   = args["--listen"].(string)
 
 		api    = newAPI(repositoriesDir)
 		router = gin.New()
@@ -39,7 +39,7 @@ func main() {
 
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
-	router.Use(api.DetectRepositoryOS)
+	router.Use(api.detectRepositoryOS)
 
 	v1 := router.Group("/v1/")
 	v1.GET("/", api.handleListRepositories)
