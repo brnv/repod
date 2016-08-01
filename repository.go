@@ -10,4 +10,5 @@ type Repository interface {
 	RemovePackage(packageName string) error
 	EditPackage(packageName string, file io.Reader) error
 	DescribePackage(packageName string) ([]string, error)
+	ChangePackageEpoch(packageName string, epoch string) error
 }

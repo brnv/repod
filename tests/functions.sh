@@ -64,7 +64,7 @@ curl() {
             makepkg -p $testdir/PKGBUILD --clean --force
 
         curl -F \
-            package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz -XPUT \
+            package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz -XPOST \
             $api_url/$repo/$epoch/$database/$architecture/$package
     done
 }
@@ -90,7 +90,7 @@ curl() {
     curl $api_url/$repo/$epoch/$database/$architecture/$package
 }
 
-:edit-package() {
+:edit-package-description() {
     local repo="$1"
     local epoch="$2"
     local database="$3"
@@ -107,6 +107,18 @@ curl() {
         makepkg -p $testdir/PKGBUILD --clean --force
 
     curl -F \
-        package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz -XPOST \
+        package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz -XPATCH \
+        $api_url/$repo/$epoch/$database/$architecture/$package
+}
+
+:copy-package-to-epoch() {
+    local repo="$1"
+    local epoch="$2"
+    local database="$3"
+    local architecture="$4"
+    local package="$5"
+    local new_epoch="$6"
+
+    curl -d "new_epoch=$new_epoch" -XPATCH \
         $api_url/$repo/$epoch/$database/$architecture/$package
 }

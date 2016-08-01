@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/kovetskiy/executil"
@@ -20,6 +21,8 @@ type RepositoryArch struct {
 
 const (
 	formatPacmanConfRepo = "[%s]"
+
+	permissionsPackageDefault = 0644
 )
 
 func (arch RepositoryArch) ListPackages() ([]string, error) {
@@ -73,7 +76,11 @@ func (arch *RepositoryArch) AddPackage(
 		return err
 	}
 
-	err = ioutil.WriteFile(packageFilePath, contentRaw, 0644)
+	err = ioutil.WriteFile(
+		packageFilePath,
+		contentRaw,
+		permissionsPackageDefault,
+	)
 	if err != nil {
 		return err
 	}
@@ -150,6 +157,44 @@ func (arch RepositoryArch) DescribePackage(
 	}
 
 	return packageInfo, nil
+}
+
+func (arch *RepositoryArch) ChangePackageEpoch(
+	packageName string, epoch string,
+) error {
+	files, err := filepath.Glob(arch.getPackagesPath() + "/" + packageName)
+	if err != nil {
+		return err
+	}
+
+	if len(files) == 0 {
+		return fmt.Errorf(
+			"can't find package file for package '%s'",
+			packageName,
+		)
+	}
+
+	if len(files) > 1 {
+		return fmt.Errorf(
+			"can't find exactly one package file for package '%s', found: '%#v'",
+			packageName,
+			files,
+		)
+	}
+
+	file, err := os.Open(files[0])
+	if err != nil {
+		return err
+	}
+
+	arch.epoch = epoch
+
+	err = arch.AddPackage(packageName, file)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (arch *RepositoryArch) getDatabaseName() string {

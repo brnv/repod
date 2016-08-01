@@ -45,10 +45,10 @@ func main() {
 	v1.GET("/", api.handleListRepositories)
 	v1.GET("/:repo/", api.handleListEpoches)
 	v1.GET(urlListPackages, api.handleListPackages)
-	v1.PUT(urlPackage, api.handleAddPackage)
+	v1.POST(urlPackage, api.handleAddPackage)
 	v1.GET(urlPackage, api.handleDescribePackage)
 	v1.DELETE(urlPackage, api.handleRemovePackage)
-	v1.POST(urlPackage, api.handleEditPackage)
+	v1.PATCH(urlPackage, api.handleEditPackage)
 
 	router.Run(listenAddress)
 }

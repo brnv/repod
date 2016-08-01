@@ -128,9 +128,10 @@ func (api *API) handleListPackages(context *gin.Context) {
 
 func (api *API) handleAddPackage(context *gin.Context) {
 	var (
-		err      error
-		response = api.defaultResponse
-		request  = context.Request
+		err         error
+		response    = api.defaultResponse
+		request     = context.Request
+		packageName = context.Param("package")
 	)
 
 	repository, err := api.newRepository(context)
@@ -139,7 +140,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 		return
 	}
 
-	file, fileHeader, err := request.FormFile(postFormPackageFile)
+	file, _, err := request.FormFile(postFormPackageFile)
 	if err != nil {
 		api.sendResponse(
 			context,
@@ -150,7 +151,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 		return
 	}
 
-	err = repository.AddPackage(fileHeader.Filename, file)
+	err = repository.AddPackage(packageName, file)
 	if err != nil {
 		api.sendResponse(context, api.getErrorResponse(err))
 		return
@@ -182,7 +183,36 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 }
 
 func (api *API) handleEditPackage(context *gin.Context) {
-	api.handleAddPackage(context)
+	err := context.Request.ParseForm()
+	if err != nil {
+		api.sendResponse(context, api.getErrorResponse(err))
+		return
+	}
+
+	newEpoch := context.Request.Form.Get("new_epoch")
+	if newEpoch == "" {
+		api.handleAddPackage(context)
+		return
+	}
+
+	var (
+		packageName = context.Param("package")
+		response    = api.defaultResponse
+	)
+
+	repository, err := api.newRepository(context)
+	if err != nil {
+		api.sendResponse(context, api.getErrorResponse(err))
+		return
+	}
+
+	err = repository.ChangePackageEpoch(packageName, newEpoch)
+	if err != nil {
+		api.sendResponse(context, api.getErrorResponse(err))
+		return
+	}
+
+	api.sendResponse(context, response)
 }
 
 func (api *API) handleDescribePackage(context *gin.Context) {
@@ -230,21 +260,58 @@ func (api *API) getErrorResponse(err error) APIResponse {
 }
 
 func (api *API) newRepository(context *gin.Context) (Repository, error) {
-	path := api.repositoriesDir + "/" + context.Param("repo")
+	var (
+		err          error
+		repoPath     = api.repositoriesDir + "/" + context.Param("repo")
+		epoch        = context.Param("epoch")
+		database     = context.Param("db")
+		architecture = context.Param("arch")
+	)
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, fmt.Errorf("given repository doesn't exist")
+	err = api.ensureRepositoryPaths(repoPath, epoch, database, architecture)
+	if err != nil {
+		return nil, err
 	}
 
 	switch api.repositoryOS {
 	case osArchLinux:
 		return &RepositoryArch{
-			path:         path,
-			epoch:        context.Param("epoch"),
-			database:     context.Param("db"),
-			architecture: context.Param("arch"),
+			path:         repoPath,
+			epoch:        epoch,
+			database:     database,
+			architecture: architecture,
 		}, nil
 	}
 
 	return nil, fmt.Errorf("can't detect repository from request")
+}
+
+func (api *API) ensureRepositoryPaths(
+	repo string, epoch string, database string, architecture string,
+) error {
+	var err error
+
+	if _, err = os.Stat(repo); os.IsNotExist(err) {
+		return fmt.Errorf("given repository doesn't exist")
+	}
+
+	if epoch == "" {
+		return nil
+	}
+
+	if _, err = os.Stat(repo + "/" + epoch); os.IsNotExist(err) {
+		return fmt.Errorf("given epoch doesn't exist")
+	}
+
+	if database == "" {
+		return nil
+	}
+
+	if _, err = os.Stat(
+		repo + "/" + epoch + "/" + database,
+	); os.IsNotExist(err) {
+		return fmt.Errorf("given database '%s' doesn't exist", database)
+	}
+
+	return nil
 }
