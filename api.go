@@ -189,14 +189,19 @@ func (api *API) handleEditPackage(context *gin.Context) {
 		return
 	}
 
-	newEpoch := context.Request.Form.Get("new_epoch")
-	if newEpoch == "" {
-		api.handleAddPackage(context)
+	if api.shouldChangePackageEpoch(context) {
+		api.handleChangePackageEpoch(context)
 		return
 	}
 
+	api.handleAddPackage(context)
+
+}
+
+func (api *API) handleChangePackageEpoch(context *gin.Context) {
 	var (
 		packageName = context.Param("package")
+		newEpoch    = context.Request.Form.Get("new_epoch")
 		response    = api.defaultResponse
 	)
 
@@ -314,4 +319,13 @@ func (api *API) ensureRepositoryPaths(
 	}
 
 	return nil
+}
+
+func (api *API) shouldChangePackageEpoch(context *gin.Context) bool {
+	newEpoch := context.Request.Form.Get("new_epoch")
+	if newEpoch == "" {
+		return false
+	}
+
+	return true
 }
