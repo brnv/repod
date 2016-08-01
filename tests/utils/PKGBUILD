@@ -1,7 +1,7 @@
 pkgname="${PKGNAME:-}"
 pkgver=${PKGVER:-1}
 pkgrel=${PKGREL:-1}
-pkgdesc="This is test package description"
+pkgdesc=${PKGDESC:-"This is test package description"}
 arch=('i686' 'x86_64')
 license=('GPL')
 md5sums=('SKIP')

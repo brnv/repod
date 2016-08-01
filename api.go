@@ -182,7 +182,7 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 }
 
 func (api *API) handleEditPackage(context *gin.Context) {
-	api.sendResponse(context, api.defaultResponse)
+	api.handleAddPackage(context)
 }
 
 func (api *API) handleDescribePackage(context *gin.Context) {

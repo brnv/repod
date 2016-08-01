@@ -109,8 +109,10 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 	return nil
 }
 
-func (arch RepositoryArch) EditPackage(packageName string) error {
-	return nil
+func (arch RepositoryArch) EditPackage(
+	packageName string, packageFile io.Reader,
+) error {
+	return arch.AddPackage(packageName, packageFile)
 }
 
 func (arch RepositoryArch) DescribePackage(

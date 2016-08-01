@@ -89,3 +89,24 @@ curl() {
 
     curl $api_url/$repo/$epoch/$database/$architecture/$package
 }
+
+:edit-package() {
+    local repo="$1"
+    local epoch="$2"
+    local database="$3"
+    local architecture="$4"
+    local package="$5"
+    local description="$6"
+
+    local testdir=$(tests:get-tmp-dir)
+    local dir=$testdir/repositories/$repo/$epoch/$database/$architecture
+
+    cp $testdir/PKGBUILD $dir/
+
+    PKGDESC=$description PKGDEST=$dir PKGNAME=$package \
+        makepkg -p $testdir/PKGBUILD --clean --force
+
+    curl -F \
+        package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz -XPOST \
+        $api_url/$repo/$epoch/$database/$architecture/$package
+}
