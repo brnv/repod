@@ -170,9 +170,8 @@ func (arch *RepositoryArch) ChangePackageEpoch(
 
 	if len(files) > 1 {
 		return fmt.Errorf(
-			"can't find exactly one package file for package '%s', found: '%#v'",
-			packageName,
-			files,
+			"can't found one package file for package '%s', found: '%#v'",
+			packageName, files,
 		)
 	}
 

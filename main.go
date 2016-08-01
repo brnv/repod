@@ -37,18 +37,39 @@ func main() {
 		router = gin.New()
 	)
 
-	router.Use(gin.Logger())
-	router.Use(gin.Recovery())
-	router.Use(api.detectRepositoryOS)
+	router.Use(gin.Logger(), gin.Recovery(), api.detectRepositoryOS)
 
 	v1 := router.Group("/v1/")
-	v1.GET("/", api.handleListRepositories)
-	v1.GET("/:repo/", api.handleListEpoches)
-	v1.GET(urlListPackages, api.handleListPackages)
-	v1.POST(urlPackage, api.handleAddPackage)
-	v1.GET(urlPackage, api.handleDescribePackage)
-	v1.DELETE(urlPackage, api.handleRemovePackage)
-	v1.PATCH(urlPackage, api.handleEditPackage)
+	{
+		v1.Handle(
+			"GET", "/",
+			api.handleListRepositories,
+		)
+		v1.Handle(
+			"GET", "/:repo/",
+			api.handleListEpoches,
+		)
+		v1.Handle(
+			"GET", urlListPackages,
+			api.handleListPackages,
+		)
+		v1.Handle(
+			"POST", urlPackage,
+			api.handleAddPackage,
+		)
+		v1.Handle(
+			"GET", urlPackage,
+			api.handleDescribePackage,
+		)
+		v1.Handle(
+			"DELETE", urlPackage,
+			api.handleRemovePackage,
+		)
+		v1.Handle(
+			"PATCH", urlPackage,
+			api.handleEditPackage,
+		)
+	}
 
 	router.Run(listenAddress)
 }
