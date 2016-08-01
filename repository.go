@@ -9,5 +9,5 @@ type Repository interface {
 	AddPackage(packageName string, file io.Reader) error
 	RemovePackage(packageName string) error
 	EditPackage(packageName string) error
-	DescribePackage(packageName string) error
+	DescribePackage(packageName string) ([]string, error)
 }

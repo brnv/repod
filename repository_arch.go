@@ -23,22 +23,14 @@ const (
 )
 
 func (arch RepositoryArch) ListPackages() ([]string, error) {
-	directory, err := arch.getTmpDirectory()
+	directory, config, err := arch.preparePacmanDB()
 	if err != nil {
 		return []string{}, err
 	}
-	defer os.RemoveAll(directory)
-
-	err = arch.prepareSyncDirectory(directory)
-	if err != nil {
-		return []string{}, err
-	}
-
-	config, err := arch.getTmpPacmanConfig()
-	if err != nil {
-		return []string{}, err
-	}
-	defer os.RemoveAll(config)
+	defer func() {
+		os.RemoveAll(directory)
+		os.RemoveAll(config)
+	}()
 
 	cmd := exec.Command(
 		"pacman", "--sync", "--list",
@@ -121,8 +113,41 @@ func (arch RepositoryArch) EditPackage(packageName string) error {
 	return nil
 }
 
-func (arch RepositoryArch) DescribePackage(packageName string) error {
-	return nil
+func (arch RepositoryArch) DescribePackage(
+	packageName string,
+) ([]string, error) {
+	directory, config, err := arch.preparePacmanDB()
+	if err != nil {
+		return []string{}, err
+	}
+	defer func() {
+		os.RemoveAll(directory)
+		os.RemoveAll(config)
+	}()
+
+	cmd := exec.Command(
+		"pacman", "--sync", "--info",
+		"--config", config,
+		"--dbpath", directory,
+		packageName,
+	)
+	pacmanOutput, _, err := executil.Run(cmd)
+	if err != nil {
+		return []string{}, err
+	}
+
+	var (
+		outputLines = strings.Split(string(pacmanOutput), "\n")
+		packageInfo = []string{}
+	)
+	for _, outputLine := range outputLines {
+		packageInfo = append(
+			packageInfo,
+			outputLine,
+		)
+	}
+
+	return packageInfo, nil
 }
 
 func (arch *RepositoryArch) getDatabaseName() string {
@@ -188,4 +213,25 @@ func (arch *RepositoryArch) getTmpPacmanConfig() (string, error) {
 	}
 
 	return config.Name(), nil
+}
+
+func (arch *RepositoryArch) preparePacmanDB() (string, string, error) {
+	directory, err := arch.getTmpDirectory()
+	if err != nil {
+		return "", "", err
+	}
+
+	err = arch.prepareSyncDirectory(directory)
+	if err != nil {
+		os.RemoveAll(directory)
+		return "", "", err
+	}
+
+	config, err := arch.getTmpPacmanConfig()
+	if err != nil {
+		os.RemoveAll(directory)
+		return "", "", err
+	}
+
+	return directory, config, nil
 }

@@ -79,3 +79,13 @@ curl() {
     curl -XDELETE \
         $api_url/$repo/$epoch/$database/$architecture/$package
 }
+
+:describe-package() {
+    local repo="$1"
+    local epoch="$2"
+    local database="$3"
+    local architecture="$4"
+    local package="$5"
+
+    curl $api_url/$repo/$epoch/$database/$architecture/$package
+}

@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -34,6 +35,7 @@ const (
 	sliceKeyRepositories = "repositories"
 	sliceKeyEpoches      = "epoches"
 	sliceKeyPackages     = "packages"
+	sliceKeyPackage      = "package"
 
 	osArchLinux = "arch"
 	osUbuntu    = "ubuntu"
@@ -184,7 +186,26 @@ func (api *API) handleEditPackage(context *gin.Context) {
 }
 
 func (api *API) handleDescribePackage(context *gin.Context) {
-	api.sendResponse(context, api.defaultResponse)
+	var (
+		err         error
+		response    = api.defaultResponse
+		packageName = context.Param("package")
+	)
+
+	repository, err := api.newRepository(context)
+	if err != nil {
+		api.sendResponse(context, api.getErrorResponse(err))
+		return
+	}
+
+	response.Data[sliceKeyPackage], err =
+		repository.DescribePackage(packageName)
+	if err != nil {
+		api.sendResponse(context, api.getErrorResponse(err))
+		return
+	}
+
+	api.sendResponse(context, response)
 }
 
 func (api *API) sendResponse(
@@ -209,15 +230,21 @@ func (api *API) getErrorResponse(err error) APIResponse {
 }
 
 func (api *API) newRepository(context *gin.Context) (Repository, error) {
+	path := api.repositoriesDir + "/" + context.Param("repo")
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, fmt.Errorf("given repository doesn't exist")
+	}
+
 	switch api.repositoryOS {
 	case osArchLinux:
 		return &RepositoryArch{
-			path:         api.repositoriesDir + "/" + context.Param("repo"),
+			path:         path,
 			epoch:        context.Param("epoch"),
 			database:     context.Param("db"),
 			architecture: context.Param("arch"),
 		}, nil
 	}
 
-	return nil, fmt.Errorf("can't get repository from request")
+	return nil, fmt.Errorf("can't detect repository from request")
 }
