@@ -46,7 +46,7 @@ func main() {
 			api.handleListRepositories,
 		)
 		v1.Handle(
-			"GET", "/:repo/",
+			"GET", urlListEpoches,
 			api.handleListEpoches,
 		)
 		v1.Handle(
@@ -54,19 +54,19 @@ func main() {
 			api.handleListPackages,
 		)
 		v1.Handle(
-			"POST", urlPackage,
+			"POST", urlManipulatePackage,
 			api.handleAddPackage,
 		)
 		v1.Handle(
-			"GET", urlPackage,
+			"GET", urlManipulatePackage,
 			api.handleDescribePackage,
 		)
 		v1.Handle(
-			"DELETE", urlPackage,
+			"DELETE", urlManipulatePackage,
 			api.handleRemovePackage,
 		)
 		v1.Handle(
-			"PATCH", urlPackage,
+			"PATCH", urlManipulatePackage,
 			api.handleEditPackage,
 		)
 	}

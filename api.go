@@ -16,8 +16,6 @@ import (
 type API struct {
 	repositoriesDir string
 	repositoryOS    string
-
-	defaultResponse APIResponse
 }
 
 type APIResponse struct {
@@ -29,8 +27,11 @@ type APIResponse struct {
 }
 
 const (
-	urlListPackages = "/:repo/:epoch/:db/:arch"
-	urlPackage      = urlListPackages + "/:package"
+	urlListEpoches       = "/:repo"
+	urlListDatabases     = urlListEpoches + "/:epoch"
+	urlListArchitectures = urlListDatabases + "/:db"
+	urlListPackages      = urlListArchitectures + "/:arch"
+	urlManipulatePackage = urlListPackages + "/:package"
 
 	sliceKeyRepositories = "repositories"
 	sliceKeyEpoches      = "epoches"
@@ -46,11 +47,14 @@ const (
 func newAPI(repositoriesDir string) *API {
 	return &API{
 		repositoriesDir: repositoriesDir,
-		defaultResponse: APIResponse{
-			Data:    make(map[string][]string),
-			status:  http.StatusOK,
-			Success: true,
-		},
+	}
+}
+
+func newAPIResponse() APIResponse {
+	return APIResponse{
+		Data:    make(map[string][]string),
+		status:  http.StatusOK,
+		Success: true,
 	}
 }
 
@@ -67,11 +71,13 @@ func (api *API) detectRepositoryOS(context *gin.Context) {
 }
 
 func (api API) handleListRepositories(context *gin.Context) {
-	response := api.defaultResponse
+	response := newAPIResponse()
 
 	repositories, err := ioutil.ReadDir(api.repositoriesDir)
 	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
+		if os.IsNotExist(err) {
+			err = errors.New("unknown repo")
+		}
 		return
 	}
 
@@ -86,12 +92,15 @@ func (api API) handleListRepositories(context *gin.Context) {
 
 func (api *API) handleListEpoches(context *gin.Context) {
 	var (
-		response      = api.defaultResponse
+		response      = newAPIResponse()
 		repositoryDir = api.repositoriesDir + "/" + context.Param("repo")
 	)
 
 	epoches, err := ioutil.ReadDir(repositoryDir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			err = errors.New("unknown repo")
+		}
 		api.sendResponse(context, api.getErrorResponse(err))
 		return
 	}
@@ -108,7 +117,7 @@ func (api *API) handleListEpoches(context *gin.Context) {
 func (api *API) handleListPackages(context *gin.Context) {
 	var (
 		err      error
-		response = api.defaultResponse
+		response = newAPIResponse()
 	)
 
 	repository, err := api.newRepository(context)
@@ -129,7 +138,7 @@ func (api *API) handleListPackages(context *gin.Context) {
 func (api *API) handleAddPackage(context *gin.Context) {
 	var (
 		err         error
-		response    = api.defaultResponse
+		response    = newAPIResponse()
 		request     = context.Request
 		packageName = context.Param("package")
 	)
@@ -163,7 +172,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 func (api *API) handleRemovePackage(context *gin.Context) {
 	var (
 		err         error
-		response    = api.defaultResponse
+		response    = newAPIResponse()
 		packageName = context.Param("package")
 	)
 
@@ -202,7 +211,7 @@ func (api *API) handleChangePackageEpoch(context *gin.Context) {
 	var (
 		packageName = context.Param("package")
 		newEpoch    = context.Request.Form.Get("new_epoch")
-		response    = api.defaultResponse
+		response    = newAPIResponse()
 	)
 
 	repository, err := api.newRepository(context)
@@ -223,7 +232,7 @@ func (api *API) handleChangePackageEpoch(context *gin.Context) {
 func (api *API) handleDescribePackage(context *gin.Context) {
 	var (
 		err         error
-		response    = api.defaultResponse
+		response    = newAPIResponse()
 		packageName = context.Param("package")
 	)
 
