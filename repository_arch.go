@@ -50,13 +50,11 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 		packages    = []string{}
 	)
 	for _, outputLine := range outputLines {
-		// outputLine example: "testing-db-testing package_name 1-1"
-		if strings.Count(outputLine, " ") > 1 {
-			packages = append(
-				packages,
-				strings.Split(outputLine, " ")[1],
-			)
+		if outputLine == "" {
+			continue
 		}
+
+		packages = append(packages, outputLine)
 	}
 
 	return packages, nil
