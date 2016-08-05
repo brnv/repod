@@ -154,7 +154,9 @@ func (api *API) handleAddPackage(context *gin.Context) {
 		api.sendResponse(
 			context,
 			api.getErrorResponse(
-				errors.New("can't read package file form file"),
+				fmt.Errorf(
+					"can't read package file form file: %s", err.Error(),
+				),
 			),
 		)
 		return
