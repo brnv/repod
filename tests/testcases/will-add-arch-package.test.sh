@@ -13,16 +13,19 @@ Error = ""
 actual=$(:list-packages arch-repo testing testing-db x86_64)
 
 tests:assert-equals "$actual" "$expected"
-tests:assert-success
 
-:add-package arch-repo testing testing-db x86_64 package_one
+expected='Success = true
+Error = ""
+
+[Data]'
+
+actual=$(:add-package arch-repo testing testing-db x86_64 package_one)
 
 expected='Success = true
 Error = ""
 
 [Data]
-  packages = ["package_one"]'
+  packages = ["testing-db-testing package_one 1-1"]'
 actual=$(:list-packages arch-repo testing testing-db x86_64)
 
 tests:assert-equals "$actual" "$expected"
-tests:assert-success

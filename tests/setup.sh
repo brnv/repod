@@ -35,7 +35,7 @@ tests:clone tests/utils/PKGBUILD PKGBUILD
 :list-epoches() {
     local repo="$1"
 
-    :curl $api_url/$repo/
+    :curl $api_url/$repo
 }
 
 :list-packages() {
@@ -121,6 +121,6 @@ tests:clone tests/utils/PKGBUILD PKGBUILD
     local package="$5"
     local new_epoch="$6"
 
-    :curl -d "new_epoch=$new_epoch" -XPATCH \
+    :curl -d "epoch_new=$new_epoch" -XPATCH \
         $api_url/$repo/$epoch/$database/$architecture/$package
 }

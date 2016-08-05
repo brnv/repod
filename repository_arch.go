@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -60,13 +61,26 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 	return packages, nil
 }
 
-func (arch *RepositoryArch) AddPackage(
-	packageName string, packageFile io.Reader,
-) error {
-	// check if this version were installed
-	// find and remove any other version of package
-	// put new version into backup dir
+func (arch *RepositoryArch) ListEpoches() ([]string, error) {
+	epochFiles, err := ioutil.ReadDir(arch.path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = errors.New("unknown repo")
+		}
+		return []string{}, err
+	}
 
+	epoches := []string{}
+	for _, epochFile := range epochFiles {
+		epoches = append(epoches, epochFile.Name())
+	}
+
+	return epoches, nil
+}
+
+func (arch *RepositoryArch) AddPackage(
+	packageName string, packageFile io.Reader, force bool,
+) error {
 	packageFilePath := arch.getPackagesPath() + "/" + packageName
 
 	contentRaw, err := ioutil.ReadAll(packageFile)
@@ -89,12 +103,22 @@ func (arch *RepositoryArch) AddPackage(
 		return err
 	}
 
-	cmd = exec.Command(
-		"repo-add", "-s", arch.getDatabaseFilePath(), packageFilePath,
-	)
-	_, _, err = executil.Run(cmd)
+	cmdOptions := []string{
+		"-s",
+		arch.getDatabaseFilePath(),
+		packageFilePath,
+	}
+	if !force {
+		cmdOptions = append([]string{"-n"}, cmdOptions...)
+	}
+
+	_, stderr, err := executil.Run(exec.Command("repo-add", cmdOptions...))
 	if err != nil {
 		return err
+	}
+
+	if !force && string(stderr) != "" {
+		return fmt.Errorf("can't add package that already exists in repo")
 	}
 
 	return nil
@@ -151,36 +175,10 @@ func (arch RepositoryArch) DescribePackage(
 	return packageInfo, nil
 }
 
-func (arch *RepositoryArch) ChangePackageEpoch(
-	packageName string, epoch string,
+func (arch *RepositoryArch) EditPackage(
+	packageName string, file io.Reader,
 ) error {
-	files, err := filepath.Glob(arch.getPackagesPath() + "/" + packageName)
-	if err != nil {
-		return err
-	}
-
-	if len(files) == 0 {
-		return fmt.Errorf(
-			"can't find package file for package '%s'",
-			packageName,
-		)
-	}
-
-	if len(files) > 1 {
-		return fmt.Errorf(
-			"can't found one package file for package '%s', found: '%#v'",
-			packageName, files,
-		)
-	}
-
-	file, err := os.Open(files[0])
-	if err != nil {
-		return err
-	}
-
-	arch.epoch = epoch
-
-	err = arch.AddPackage(packageName, file)
+	err := arch.AddPackage(packageName, file, true)
 	if err != nil {
 		return err
 	}
@@ -272,4 +270,38 @@ func (arch *RepositoryArch) preparePacmanDB() (string, string, error) {
 	}
 
 	return directory, config, nil
+}
+
+func (arch *RepositoryArch) GetPackageFile(
+	packageName string,
+) (io.Reader, error) {
+	files, err := filepath.Glob(arch.getPackagesPath() + "/" + packageName)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(files) == 0 {
+		return nil, fmt.Errorf(
+			"can't find package file for package '%s'",
+			packageName,
+		)
+	}
+
+	if len(files) > 1 {
+		return nil, fmt.Errorf(
+			"can't found one package file for package '%s', found: '%#v'",
+			packageName, files,
+		)
+	}
+
+	file, err := os.Open(files[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return file, nil
+}
+
+func (arch *RepositoryArch) SetEpoch(epoch string) {
+	arch.epoch = epoch
 }

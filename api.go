@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -91,23 +92,23 @@ func (api API) handleListRepositories(context *gin.Context) {
 }
 
 func (api *API) handleListEpoches(context *gin.Context) {
-	var (
-		response      = newAPIResponse()
-		repositoryDir = api.repositoriesDir + "/" + context.Param("repo")
-	)
+	response := newAPIResponse()
 
-	epoches, err := ioutil.ReadDir(repositoryDir)
+	repository, err := api.newRepository(context)
 	if err != nil {
-		if os.IsNotExist(err) {
-			err = errors.New("unknown repo")
-		}
+		api.sendResponse(context, api.getErrorResponse(err))
+		return
+	}
+
+	epoches, err := repository.ListEpoches()
+	if err != nil {
 		api.sendResponse(context, api.getErrorResponse(err))
 		return
 	}
 
 	for _, epoch := range epoches {
 		response.Data[sliceKeyEpoches] = append(
-			response.Data[sliceKeyEpoches], epoch.Name(),
+			response.Data[sliceKeyEpoches], epoch,
 		)
 	}
 
@@ -149,20 +150,13 @@ func (api *API) handleAddPackage(context *gin.Context) {
 		return
 	}
 
-	file, _, err := request.FormFile(postFormPackageFile)
+	file, err := api.getFileFromRequest(request)
 	if err != nil {
-		api.sendResponse(
-			context,
-			api.getErrorResponse(
-				fmt.Errorf(
-					"can't read package file form file: %s", err.Error(),
-				),
-			),
-		)
+		api.sendResponse(context, api.getErrorResponse(err))
 		return
 	}
 
-	err = repository.AddPackage(packageName, file)
+	err = repository.AddPackage(packageName, file, false)
 	if err != nil {
 		api.sendResponse(context, api.getErrorResponse(err))
 		return
@@ -194,27 +188,19 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 }
 
 func (api *API) handleEditPackage(context *gin.Context) {
-	err := context.Request.ParseForm()
+	var (
+		err         error
+		response    = newAPIResponse()
+		request     = context.Request
+		packageName = context.Param("package")
+		file        io.Reader
+	)
+
+	err = request.ParseForm()
 	if err != nil {
 		api.sendResponse(context, api.getErrorResponse(err))
 		return
 	}
-
-	if api.shouldChangePackageEpoch(context) {
-		api.handleChangePackageEpoch(context)
-		return
-	}
-
-	api.handleAddPackage(context)
-
-}
-
-func (api *API) handleChangePackageEpoch(context *gin.Context) {
-	var (
-		packageName = context.Param("package")
-		newEpoch    = context.Request.Form.Get("new_epoch")
-		response    = newAPIResponse()
-	)
 
 	repository, err := api.newRepository(context)
 	if err != nil {
@@ -222,7 +208,21 @@ func (api *API) handleChangePackageEpoch(context *gin.Context) {
 		return
 	}
 
-	err = repository.ChangePackageEpoch(packageName, newEpoch)
+	epochNew := request.Form.Get("epoch_new")
+
+	if len(epochNew) == 0 {
+		file, err = api.getFileFromRequest(request)
+	} else {
+		file, err = repository.GetPackageFile(packageName)
+		repository.SetEpoch(epochNew)
+	}
+
+	if err != nil {
+		api.sendResponse(context, api.getErrorResponse(err))
+		return
+	}
+
+	err = repository.EditPackage(packageName, file)
 	if err != nil {
 		api.sendResponse(context, api.getErrorResponse(err))
 		return
@@ -332,11 +332,13 @@ func (api *API) ensureRepositoryPaths(
 	return nil
 }
 
-func (api *API) shouldChangePackageEpoch(context *gin.Context) bool {
-	newEpoch := context.Request.Form.Get("new_epoch")
-	if newEpoch == "" {
-		return false
+func (api *API) getFileFromRequest(request *http.Request) (io.Reader, error) {
+	file, _, err := request.FormFile(postFormPackageFile)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"can't read package file form file: %s", err.Error(),
+		)
 	}
 
-	return true
+	return file, nil
 }
