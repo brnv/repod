@@ -9,8 +9,6 @@ var version = "1.0"
 
 var usage = `repod - daemon to manage packages repository stored on host.
 
-Required. TODO.
-
 Usage:
 	repod -h | --help
 	repod [--listen=<url>] [--repos-dir=<path>]
