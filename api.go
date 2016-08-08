@@ -277,9 +277,7 @@ func (api *API) handleDescribePackage(context *gin.Context) {
 	api.sendResponse(context, response)
 }
 
-func (api *API) sendResponse(
-	context *gin.Context, response APIResponse,
-) {
+func (api *API) sendResponse(context *gin.Context, response APIResponse) {
 	if response.Error != "" {
 		response.status = http.StatusInternalServerError
 		response.Success = false
@@ -297,14 +295,13 @@ func (api *API) sendResponse(
 
 func (api *API) newRepository(context *gin.Context) (Repository, error) {
 	var (
-		err          error
 		repoPath     = api.repositoriesDir + context.Param("repo")
 		epoch        = context.Param("epoch")
 		database     = context.Param("db")
 		architecture = context.Param("arch")
 	)
 
-	err = api.ensureRepositoryPaths(repoPath, epoch, database, architecture)
+	err := api.ensureRepositoryPaths(repoPath, epoch, database, architecture)
 	if err != nil {
 		return nil, hierr.Errorf(
 			err,
@@ -329,9 +326,7 @@ func (api *API) newRepository(context *gin.Context) (Repository, error) {
 func (api *API) ensureRepositoryPaths(
 	repo string, epoch string, database string, architecture string,
 ) error {
-	var err error
-
-	if _, err = os.Stat(repo); err != nil {
+	if _, err := os.Stat(repo); err != nil {
 		return hierr.Errorf(err, "can't stat repo %s", repo)
 	}
 
@@ -339,7 +334,7 @@ func (api *API) ensureRepositoryPaths(
 		return nil
 	}
 
-	if _, err = os.Stat(repo + "/" + epoch); os.IsNotExist(err) {
+	if _, err := os.Stat(repo + "/" + epoch); err != nil {
 		return hierr.Errorf(
 			err, "can't stat repo's epoch %s/%s", repo, epoch,
 		)
@@ -349,7 +344,7 @@ func (api *API) ensureRepositoryPaths(
 		return nil
 	}
 
-	if _, err = os.Stat(repo + "/" + epoch + "/" + database); err != nil {
+	if _, err := os.Stat(repo + "/" + epoch + "/" + database); err != nil {
 		return hierr.Errorf(
 			err, "can't stat repo's epoch's database %s/%s/%s",
 			repo, epoch, database,

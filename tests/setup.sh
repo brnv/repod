@@ -6,7 +6,7 @@ api_url="http://localhost:6333/v1"
     /bin/curl -s ${@}
 }
 
-tests:clone tests/repod bin/repod
+tests:clone repod bin/repod
 tests:clone tests/mocks/gpg bin/gpg
 tests:clone tests/utils/PKGBUILD PKGBUILD
 
@@ -18,9 +18,9 @@ tests:clone tests/utils/PKGBUILD PKGBUILD
 
 :bootstrap-repository() {
     local repo="$1"
-    local epoch="$2"
-    local database="$3"
-    local architecture="$4"
+    local epoch="${2:-}"
+    local database="${3:-}"
+    local architecture="${4:-}"
 
     local testdir=$(tests:get-tmp-dir)
     local dir=$testdir/repositories/$repo/$epoch/$database/$architecture
@@ -68,6 +68,30 @@ tests:clone tests/utils/PKGBUILD PKGBUILD
         :curl -F \
             package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz -XPOST \
             $api_url/$repo/$epoch/$database/$architecture/$package
+    done
+}
+
+:add-package-fail() {
+    local repo="$1"
+    local epoch="$2"
+    local database="$3"
+    local architecture="$4"
+    shift 4
+
+    local packages=${@}
+
+    local testdir=$(tests:get-tmp-dir)
+    local dir=$testdir/repositories/$repo/$epoch/$database/$architecture
+
+    for package in $packages; do
+        cp $testdir/PKGBUILD $dir/
+
+        PKGDEST=$dir PKGNAME=$package \
+            makepkg -p $testdir/PKGBUILD --clean --force
+
+        :curl -F \
+            package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz -XPOST \
+            $api_url/unknown_repo/$epoch/$database/$architecture/$package
     done
 }
 

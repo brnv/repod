@@ -76,6 +76,13 @@ func (arch *RepositoryArch) ListEpoches() ([]string, error) {
 		epoches = append(epoches, epochFile.Name())
 	}
 
+	if len(epoches) == 0 {
+		return []string{}, hierr.Errorf(
+			err,
+			`no epoches found for repo %s`, arch.path,
+		)
+	}
+
 	return epoches, nil
 }
 

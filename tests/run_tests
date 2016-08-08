@@ -8,7 +8,8 @@ source ../vendor/github.com/reconquest/import.bash/import.bash
 import:source "github.com/reconquest/test-runner.bash"
 
 :build() {
-    cd .. && go build -o ./tests/repod
+    cd ../
+    GOBIN=$(pwd) go install
 }
 
 :main() {
