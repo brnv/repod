@@ -7,6 +7,14 @@ import (
 
 var version = "1.0"
 
+const (
+	urlListEpoches       = "/:repo"
+	urlListDatabases     = urlListEpoches + "/:epoch"
+	urlListArchitectures = urlListDatabases + "/:db"
+	urlListPackages      = urlListArchitectures + "/:arch"
+	urlManipulatePackage = urlListPackages + "/:package"
+)
+
 var usage = `repod - daemon to manage packages repository stored on host.
 
 Usage:

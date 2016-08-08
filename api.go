@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kovetskiy/toml"
+	"github.com/reconquest/hierr"
 )
 
 type API struct {
@@ -20,20 +20,14 @@ type API struct {
 }
 
 type APIResponse struct {
-	Success bool                `json:"success"`
-	Error   string              `json:"error"`
-	Data    map[string][]string `json:"data"`
+	Success bool
+	Error   string
+	Data    map[string][]string
 
 	status int
 }
 
 const (
-	urlListEpoches       = "/:repo"
-	urlListDatabases     = urlListEpoches + "/:epoch"
-	urlListArchitectures = urlListDatabases + "/:db"
-	urlListPackages      = urlListArchitectures + "/:arch"
-	urlManipulatePackage = urlListPackages + "/:package"
-
 	sliceKeyRepositories = "repositories"
 	sliceKeyEpoches      = "epoches"
 	sliceKeyPackages     = "packages"
@@ -71,15 +65,14 @@ func (api *API) detectRepositoryOS(context *gin.Context) {
 	}
 }
 
-func (api API) handleListRepositories(context *gin.Context) {
+func (api *API) handleListRepositories(context *gin.Context) {
 	response := newAPIResponse()
 
 	repositories, err := ioutil.ReadDir(api.repositoriesDir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			err = errors.New("unknown repo")
-		}
-		return
+		response.Error = hierr.Errorf(
+			err, "can't read repo dir %s", api.repositoriesDir,
+		).Error()
 	}
 
 	for _, repository := range repositories {
@@ -92,18 +85,27 @@ func (api API) handleListRepositories(context *gin.Context) {
 }
 
 func (api *API) handleListEpoches(context *gin.Context) {
-	response := newAPIResponse()
+	var (
+		response = newAPIResponse()
+		epoches  []string
+	)
 
 	repository, err := api.newRepository(context)
 	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
+		response.Error = hierr.Errorf(
+			err,
+			"can't start work with repo",
+		).Error()
 	}
 
-	epoches, err := repository.ListEpoches()
-	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
+	if repository != nil {
+		epoches, err = repository.ListEpoches()
+		if err != nil {
+			response.Error = hierr.Errorf(
+				err,
+				"can't list epoches for repo",
+			).Error()
+		}
 	}
 
 	for _, epoch := range epoches {
@@ -123,14 +125,20 @@ func (api *API) handleListPackages(context *gin.Context) {
 
 	repository, err := api.newRepository(context)
 	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
+		response.Error = hierr.Errorf(
+			err,
+			"can't start work with repo",
+		).Error()
 	}
 
-	response.Data[sliceKeyPackages], err = repository.ListPackages()
-	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
+	if repository != nil {
+		response.Data[sliceKeyPackages], err = repository.ListPackages()
+		if err != nil {
+			response.Error = hierr.Errorf(
+				err,
+				"can't list packages for repo",
+			).Error()
+		}
 	}
 
 	api.sendResponse(context, response)
@@ -142,24 +150,35 @@ func (api *API) handleAddPackage(context *gin.Context) {
 		response    = newAPIResponse()
 		request     = context.Request
 		packageName = context.Param("package")
+		file        io.Reader
 	)
 
 	repository, err := api.newRepository(context)
 	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
+		response.Error = hierr.Errorf(
+			err,
+			"can't start work with repo",
+		).Error()
 	}
 
-	file, err := api.getFileFromRequest(request)
-	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
+	if repository != nil {
+		file, err = api.getFileFromRequest(request)
+		if err != nil {
+			response.Error = hierr.Errorf(
+				err,
+				"can't get file from request",
+			).Error()
+		}
 	}
 
-	err = repository.AddPackage(packageName, file, false)
-	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
+	if file != nil {
+		err = repository.AddPackage(packageName, file, false)
+		if err != nil {
+			response.Error = hierr.Errorf(
+				err,
+				"can't add package",
+			).Error()
+		}
 	}
 
 	api.sendResponse(context, response)
@@ -174,14 +193,17 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 
 	repository, err := api.newRepository(context)
 	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
+		response.Error = hierr.Errorf(
+			err,
+			"can't start work with repo",
+		).Error()
 	}
 
-	err = repository.RemovePackage(packageName)
-	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
+	if repository != nil {
+		err = repository.RemovePackage(packageName)
+		if err != nil {
+			response.Error = err.Error()
+		}
 	}
 
 	api.sendResponse(context, response)
@@ -196,36 +218,33 @@ func (api *API) handleEditPackage(context *gin.Context) {
 		file        io.Reader
 	)
 
-	err = request.ParseForm()
-	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
-	}
+	request.ParseForm()
+	epochNew := request.Form.Get("epoch_new")
 
 	repository, err := api.newRepository(context)
 	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
+		response.Error = hierr.Errorf(
+			err,
+			"can't start work with repo",
+		).Error()
 	}
 
-	epochNew := request.Form.Get("epoch_new")
+	if repository != nil {
+		if epochNew != "" {
+			file, err = repository.GetPackageFile(packageName)
+			repository.SetEpoch(epochNew)
+		} else {
+			file, err = api.getFileFromRequest(request)
+		}
 
-	if len(epochNew) == 0 {
-		file, err = api.getFileFromRequest(request)
-	} else {
-		file, err = repository.GetPackageFile(packageName)
-		repository.SetEpoch(epochNew)
-	}
+		if err != nil {
+			response.Error = err.Error()
+		}
 
-	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
-	}
-
-	err = repository.EditPackage(packageName, file)
-	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
+		err = repository.EditPackage(packageName, file)
+		if err != nil {
+			response.Error = err.Error()
+		}
 	}
 
 	api.sendResponse(context, response)
@@ -240,15 +259,19 @@ func (api *API) handleDescribePackage(context *gin.Context) {
 
 	repository, err := api.newRepository(context)
 	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
+		response.Error = hierr.Errorf(
+			err,
+			"can't start work with repo",
+		).Error()
 	}
 
-	response.Data[sliceKeyPackage], err =
-		repository.DescribePackage(packageName)
-	if err != nil {
-		api.sendResponse(context, api.getErrorResponse(err))
-		return
+	if repository != nil {
+		response.Data[sliceKeyPackage], err = repository.DescribePackage(
+			packageName,
+		)
+		if err != nil {
+			response.Error = err.Error()
+		}
 	}
 
 	api.sendResponse(context, response)
@@ -257,6 +280,11 @@ func (api *API) handleDescribePackage(context *gin.Context) {
 func (api *API) sendResponse(
 	context *gin.Context, response APIResponse,
 ) {
+	if response.Error != "" {
+		response.status = http.StatusInternalServerError
+		response.Success = false
+	}
+
 	err := toml.NewEncoder(context.Writer).Encode(response)
 	if err != nil {
 		log.Printf("can't send response %#v", response)
@@ -267,18 +295,10 @@ func (api *API) sendResponse(
 	context.Writer.WriteHeader(response.status)
 }
 
-func (api *API) getErrorResponse(err error) APIResponse {
-	return APIResponse{
-		Success: false,
-		Error:   err.Error(),
-		status:  http.StatusInternalServerError,
-	}
-}
-
 func (api *API) newRepository(context *gin.Context) (Repository, error) {
 	var (
 		err          error
-		repoPath     = api.repositoriesDir + "/" + context.Param("repo")
+		repoPath     = api.repositoriesDir + context.Param("repo")
 		epoch        = context.Param("epoch")
 		database     = context.Param("db")
 		architecture = context.Param("arch")
@@ -286,7 +306,11 @@ func (api *API) newRepository(context *gin.Context) (Repository, error) {
 
 	err = api.ensureRepositoryPaths(repoPath, epoch, database, architecture)
 	if err != nil {
-		return nil, err
+		return nil, hierr.Errorf(
+			err,
+			"can't ensure repo paths: %s/%s/%s/%s",
+			repoPath, epoch, database, architecture,
+		)
 	}
 
 	switch api.repositoryOS {
@@ -307,8 +331,8 @@ func (api *API) ensureRepositoryPaths(
 ) error {
 	var err error
 
-	if _, err = os.Stat(repo); os.IsNotExist(err) {
-		return fmt.Errorf("given repository doesn't exist")
+	if _, err = os.Stat(repo); err != nil {
+		return hierr.Errorf(err, "can't stat repo %s", repo)
 	}
 
 	if epoch == "" {
@@ -316,17 +340,20 @@ func (api *API) ensureRepositoryPaths(
 	}
 
 	if _, err = os.Stat(repo + "/" + epoch); os.IsNotExist(err) {
-		return fmt.Errorf("given epoch doesn't exist")
+		return hierr.Errorf(
+			err, "can't stat repo's epoch %s/%s", repo, epoch,
+		)
 	}
 
 	if database == "" {
 		return nil
 	}
 
-	if _, err = os.Stat(
-		repo + "/" + epoch + "/" + database,
-	); os.IsNotExist(err) {
-		return fmt.Errorf("given database '%s' doesn't exist", database)
+	if _, err = os.Stat(repo + "/" + epoch + "/" + database); err != nil {
+		return hierr.Errorf(
+			err, "can't stat repo's epoch's database %s/%s/%s",
+			repo, epoch, database,
+		)
 	}
 
 	return nil
@@ -335,9 +362,7 @@ func (api *API) ensureRepositoryPaths(
 func (api *API) getFileFromRequest(request *http.Request) (io.Reader, error) {
 	file, _, err := request.FormFile(postFormPackageFile)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"can't read package file form file: %s", err.Error(),
-		)
+		return nil, hierr.Errorf(err, "can't read form file from request")
 	}
 
 	return file, nil

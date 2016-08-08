@@ -6,7 +6,7 @@ api_url="http://localhost:6333/v1"
     /bin/curl -s ${@}
 }
 
-tests:clone repod bin/repod
+tests:clone tests/repod bin/repod
 tests:clone tests/mocks/gpg bin/gpg
 tests:clone tests/utils/PKGBUILD PKGBUILD
 

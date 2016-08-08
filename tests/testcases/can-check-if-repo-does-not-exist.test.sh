@@ -3,8 +3,8 @@
 tests:run-background bg_repod :run
 tests:wait-file-matches $(tests:get-background-stderr $bg_repod) "serving" 1 2
 
-expected="Success = false
-Error = \"given repository doesn't exist\""
+expected="can't ensure repo paths"
 
-tests:assert-equals "$(:list-packages repo-arch testing testing-db x86_64)" "$expected"
-tests:assert-success
+tests:ensure :list-packages not-exist testing testing-db x86_64
+
+tests:assert-stdout "$expected"

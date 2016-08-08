@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/kovetskiy/executil"
+	"github.com/reconquest/hierr"
 )
 
 type RepositoryArch struct {
@@ -27,10 +27,14 @@ const (
 )
 
 func (arch RepositoryArch) ListPackages() ([]string, error) {
-	directory, config, err := arch.preparePacmanDB()
+	directory, config, err := arch.preparePacmanSyncDir()
 	if err != nil {
-		return []string{}, err
+		return []string{}, hierr.Errorf(
+			err,
+			`can't prepare pacman sync directory`,
+		)
 	}
+
 	defer func() {
 		os.RemoveAll(directory)
 		os.RemoveAll(config)
@@ -43,7 +47,7 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 	)
 	pacmanOutput, _, err := executil.Run(cmd)
 	if err != nil {
-		return []string{}, err
+		return []string{}, hierr.Errorf(err, `can't execute command %s`, cmd)
 	}
 
 	var (
@@ -64,10 +68,7 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 func (arch *RepositoryArch) ListEpoches() ([]string, error) {
 	epochFiles, err := ioutil.ReadDir(arch.path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			err = errors.New("unknown repo")
-		}
-		return []string{}, err
+		return []string{}, hierr.Errorf(err, `can't read dir %s`, arch.path)
 	}
 
 	epoches := []string{}
@@ -85,7 +86,7 @@ func (arch *RepositoryArch) AddPackage(
 
 	contentRaw, err := ioutil.ReadAll(packageFile)
 	if err != nil {
-		return err
+		return hierr.Errorf(err, `can't read package file %s`, packageFile)
 	}
 
 	err = ioutil.WriteFile(
@@ -137,7 +138,7 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 func (arch RepositoryArch) DescribePackage(
 	packageName string,
 ) ([]string, error) {
-	directory, config, err := arch.preparePacmanDB()
+	directory, config, err := arch.preparePacmanSyncDir()
 	if err != nil {
 		return []string{}, err
 	}
@@ -200,7 +201,7 @@ func (arch RepositoryArch) getPackagesPath() string {
 func (arch *RepositoryArch) getTmpDirectory() (string, error) {
 	directory, err := ioutil.TempDir("/tmp/", "repod-")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("can't create temp dir: %s", err)
 	}
 
 	return directory, nil
@@ -211,15 +212,19 @@ func (arch *RepositoryArch) prepareSyncDirectory(directory string) error {
 
 	err := os.Mkdir(syncDirectoryPath, 0777)
 	if err != nil {
-		return err
+		return hierr.Errorf(err, "can't create dir %s", syncDirectoryPath)
 	}
 
+	targetLink := syncDirectoryPath + "/" + arch.getDatabaseFilename()
 	err = os.Symlink(
 		arch.getDatabaseFilePath(),
-		syncDirectoryPath+"/"+arch.getDatabaseFilename(),
+		targetLink,
 	)
 	if err != nil {
-		return err
+		return hierr.Errorf(
+			err,
+			"can't symlink %s to %s", arch.getDatabaseFilePath(), targetLink,
+		)
 	}
 
 	return nil
@@ -244,22 +249,22 @@ func (arch *RepositoryArch) getTmpPacmanConfig() (string, error) {
 	return config.Name(), nil
 }
 
-func (arch *RepositoryArch) preparePacmanDB() (string, string, error) {
+func (arch *RepositoryArch) preparePacmanSyncDir() (string, string, error) {
 	directory, err := arch.getTmpDirectory()
 	if err != nil {
-		return "", "", err
+		return "", "", hierr.Errorf(err, `can't get pacman sync directory`)
 	}
 
 	err = arch.prepareSyncDirectory(directory)
 	if err != nil {
 		os.RemoveAll(directory)
-		return "", "", err
+		return "", "", hierr.Errorf(err, `can't prepare pacman sync directory`)
 	}
 
 	config, err := arch.getTmpPacmanConfig()
 	if err != nil {
 		os.RemoveAll(directory)
-		return "", "", err
+		return "", "", hierr.Errorf(err, `can't get pacman temporary config`)
 	}
 
 	return directory, config, nil
@@ -268,28 +273,30 @@ func (arch *RepositoryArch) preparePacmanDB() (string, string, error) {
 func (arch *RepositoryArch) GetPackageFile(
 	packageName string,
 ) (io.Reader, error) {
-	files, err := filepath.Glob(arch.getPackagesPath() + "/" + packageName)
+	pattern := arch.getPackagesPath() + "/" + packageName
+
+	files, err := filepath.Glob(pattern)
 	if err != nil {
-		return nil, err
+		return nil, hierr.Errorf(
+			err,
+			`can't find files by pattern %s`, pattern,
+		)
 	}
 
 	if len(files) == 0 {
-		return nil, fmt.Errorf(
-			"can't find package file for package '%s'",
-			packageName,
-		)
+		return nil, fmt.Errorf("no files found by pattern %s", pattern)
 	}
 
 	if len(files) > 1 {
 		return nil, fmt.Errorf(
-			"can't found one package file for package '%s', found: '%#v'",
-			packageName, files,
+			"more than one file found by pattern %s, %#v",
+			pattern, files,
 		)
 	}
 
 	file, err := os.Open(files[0])
 	if err != nil {
-		return nil, err
+		return nil, hierr.Errorf(err, `can't open file %s`, files[0])
 	}
 
 	return file, nil
