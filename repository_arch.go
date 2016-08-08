@@ -103,11 +103,7 @@ func (arch *RepositoryArch) AddPackage(
 		return err
 	}
 
-	cmdOptions := []string{
-		"-s",
-		arch.getDatabaseFilePath(),
-		packageFilePath,
-	}
+	cmdOptions := []string{"-s", arch.getDatabaseFilePath(), packageFilePath}
 	if !force {
 		cmdOptions = append([]string{"-n"}, cmdOptions...)
 	}
@@ -166,10 +162,7 @@ func (arch RepositoryArch) DescribePackage(
 		packageInfo = []string{}
 	)
 	for _, outputLine := range outputLines {
-		packageInfo = append(
-			packageInfo,
-			outputLine,
-		)
+		packageInfo = append(packageInfo, outputLine)
 	}
 
 	return packageInfo, nil
