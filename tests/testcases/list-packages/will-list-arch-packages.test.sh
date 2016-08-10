@@ -15,4 +15,3 @@ Status = 200
 actual=$(:list-packages arch-repo testing testing-db x86_64)
 
 tests:assert-equals "$actual" "$expected"
-tests:assert-success

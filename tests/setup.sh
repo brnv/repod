@@ -6,12 +6,13 @@ api_url="http://localhost:6333/v1"
     /bin/curl -s ${@}
 }
 
-tests:clone repod bin/repod
+tests:clone repod.test bin/
 tests:clone tests/mocks/gpg bin/gpg
 tests:clone tests/utils/PKGBUILD PKGBUILD
 
 :run() {
-    PATH=$PATH:$(tests:get-tmp-dir)/bin repod \
+    tests:eval go-test:run \
+        repod.test \
         --listen=":6333" \
         --root=$(tests:get-tmp-dir)/repositories/
 }

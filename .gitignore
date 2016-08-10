@@ -1,2 +1,5 @@
 .last-testcase
 repod
+repod.test
+coverage
+.cover

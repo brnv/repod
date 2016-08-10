@@ -201,15 +201,6 @@ func (arch RepositoryArch) getPackagesPath() string {
 	)
 }
 
-func (arch *RepositoryArch) getTmpDirectory() (string, error) {
-	directory, err := ioutil.TempDir("/tmp/", "repod-")
-	if err != nil {
-		return "", fmt.Errorf("can't create temp dir: %s", err)
-	}
-
-	return directory, nil
-}
-
 func (arch *RepositoryArch) prepareSyncDirectory(directory string) error {
 	syncDirectoryPath := directory + "/sync"
 
@@ -253,9 +244,9 @@ func (arch *RepositoryArch) getTmpPacmanConfig() (string, error) {
 }
 
 func (arch *RepositoryArch) preparePacmanSyncDir() (string, string, error) {
-	directory, err := arch.getTmpDirectory()
+	directory, err := ioutil.TempDir("/tmp/", "repod-")
 	if err != nil {
-		return "", "", hierr.Errorf(err, `can't get pacman sync directory`)
+		return "", "", hierr.Errorf(err, "can't create temp dir: %s")
 	}
 
 	err = arch.prepareSyncDirectory(directory)

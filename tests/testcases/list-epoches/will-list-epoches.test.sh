@@ -11,4 +11,3 @@ Status = 200
   epoches = ["testing"]'
 
 tests:assert-equals "$(:list-epoches arch-repo)" "$expected"
-tests:assert-success

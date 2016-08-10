@@ -12,5 +12,3 @@ Status = 200
   repositories = ["arch-repo", "ubuntu-repo"]'
 
 tests:assert-equals "$(:list-repositories)" "$expected"
-
-tests:assert-success

@@ -14,7 +14,6 @@ Status = 200
 actual=$(:list-packages arch-repo testing testing-db x86_64)
 
 tests:assert-equals "$actual" "$expected"
-tests:assert-success
 
 tests:ensure :stat-package arch-repo testing testing-db x86_64 package_one
 
@@ -29,7 +28,6 @@ Status = 200
 actual=$(:list-packages arch-repo testing testing-db x86_64)
 
 tests:assert-equals "$actual" "$expected"
-tests:assert-success
 
 tests:not tests:ensure :stat-package \
     arch-repo testing testing-db x86_64 package_one

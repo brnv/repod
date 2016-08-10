@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/gin-gonic/gin"
 	"github.com/kovetskiy/godocs"
 	"github.com/kovetskiy/lorg"
@@ -9,6 +11,7 @@ import (
 var (
 	logger  = lorg.NewLog()
 	version = "1"
+	exit    = os.Exit
 )
 
 const (
