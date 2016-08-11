@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -23,8 +24,7 @@ type APIResponse struct {
 	Success bool
 	Error   string
 	Data    map[string][]string
-
-	status int
+	Status  int
 }
 
 const (
@@ -48,7 +48,7 @@ func newAPI(repositoriesDir string) *API {
 func newAPIResponse() APIResponse {
 	return APIResponse{
 		Data:    make(map[string][]string),
-		status:  http.StatusOK,
+		Status:  http.StatusOK,
 		Success: true,
 	}
 }
@@ -70,6 +70,7 @@ func (api *API) handleListRepositories(context *gin.Context) {
 
 	repositories, err := ioutil.ReadDir(api.repositoriesDir)
 	if err != nil {
+		response.Status = http.StatusInternalServerError
 		response.Error = hierr.Errorf(
 			err, "can't read repo dir %s", api.repositoriesDir,
 		).Error()
@@ -92,6 +93,7 @@ func (api *API) handleListEpoches(context *gin.Context) {
 
 	repository, err := api.newRepository(context)
 	if err != nil {
+		response.Status = http.StatusBadRequest
 		response.Error = hierr.Errorf(
 			err,
 			"can't start work with repo",
@@ -101,11 +103,17 @@ func (api *API) handleListEpoches(context *gin.Context) {
 	if repository != nil {
 		epoches, err = repository.ListEpoches()
 		if err != nil {
+			response.Status = http.StatusInternalServerError
 			response.Error = hierr.Errorf(
 				err,
 				"can't list epoches for repo",
 			).Error()
 		}
+	}
+
+	if len(epoches) == 0 && response.Error == "" {
+		response.Status = http.StatusBadRequest
+		response.Error = fmt.Errorf("no epoches found for repo").Error()
 	}
 
 	for _, epoch := range epoches {
@@ -125,6 +133,7 @@ func (api *API) handleListPackages(context *gin.Context) {
 
 	repository, err := api.newRepository(context)
 	if err != nil {
+		response.Status = http.StatusBadRequest
 		response.Error = hierr.Errorf(
 			err,
 			"can't start work with repo",
@@ -134,6 +143,7 @@ func (api *API) handleListPackages(context *gin.Context) {
 	if repository != nil {
 		response.Data[sliceKeyPackages], err = repository.ListPackages()
 		if err != nil {
+			response.Status = http.StatusInternalServerError
 			response.Error = hierr.Errorf(
 				err,
 				"can't list packages for repo",
@@ -155,6 +165,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 
 	repository, err := api.newRepository(context)
 	if err != nil {
+		response.Status = http.StatusBadRequest
 		response.Error = hierr.Errorf(
 			err,
 			"can't start work with repo",
@@ -279,8 +290,10 @@ func (api *API) handleDescribePackage(context *gin.Context) {
 
 func (api *API) sendResponse(context *gin.Context, response APIResponse) {
 	if response.Error != "" {
-		response.status = http.StatusInternalServerError
 		response.Success = false
+		if response.Status == 0 {
+			response.Status = http.StatusInternalServerError
+		}
 	}
 
 	err := toml.NewEncoder(context.Writer).Encode(response)
@@ -290,12 +303,15 @@ func (api *API) sendResponse(context *gin.Context, response APIResponse) {
 		return
 	}
 
-	context.Writer.WriteHeader(response.status)
+	context.Writer.WriteHeader(response.Status)
 }
 
 func (api *API) newRepository(context *gin.Context) (Repository, error) {
 	var (
-		repoPath     = api.repositoriesDir + context.Param("repo")
+		repoPath = filepath.Join(
+			api.repositoriesDir,
+			context.Param("repo"),
+		)
 		epoch        = context.Param("epoch")
 		database     = context.Param("db")
 		architecture = context.Param("arch")
@@ -320,7 +336,7 @@ func (api *API) newRepository(context *gin.Context) (Repository, error) {
 		}, nil
 	}
 
-	return nil, fmt.Errorf("can't detect repository from request")
+	return nil, fmt.Errorf("can't parse repository from request")
 }
 
 func (api *API) ensureRepositoryPaths(
@@ -334,7 +350,7 @@ func (api *API) ensureRepositoryPaths(
 		return nil
 	}
 
-	if _, err := os.Stat(repo + "/" + epoch); err != nil {
+	if _, err := os.Stat(filepath.Join(repo, epoch)); err != nil {
 		return hierr.Errorf(
 			err, "can't stat repo's epoch %s/%s", repo, epoch,
 		)
@@ -344,7 +360,7 @@ func (api *API) ensureRepositoryPaths(
 		return nil
 	}
 
-	if _, err := os.Stat(repo + "/" + epoch + "/" + database); err != nil {
+	if _, err := os.Stat(filepath.Join(repo, epoch, database)); err != nil {
 		return hierr.Errorf(
 			err, "can't stat repo's epoch's database %s/%s/%s",
 			repo, epoch, database,

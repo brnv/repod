@@ -7,6 +7,7 @@ tests:wait-file-matches $(tests:get-background-stderr $bg_repod) "serving" 1 2
 
 expected='Success = true
 Error = ""
+Status = 200
 
 [Data]
   packages = ["arch-repo-testing package_one 1-1"]'
@@ -19,6 +20,7 @@ tests:assert-equals "$actual" "$expected"
 
 expected='Success = true
 Error = ""
+Status = 200
 
 [Data]
   packages = ["arch-repo-stable package_one 1-1"]'

@@ -9,6 +9,7 @@ tests:wait-file-matches $(tests:get-background-stderr $bg_repod) "serving" 1 2
 
 expected='Success = true
 Error = ""
+Status = 200
 
 [Data]
   packages = ["testing-db-testing package_one 1-1"]'
@@ -21,6 +22,7 @@ tests:assert-success
 
 expected='Success = true
 Error = ""
+Status = 200
 
 [Data]
   packages = []'

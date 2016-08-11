@@ -71,6 +71,7 @@ tests:clone tests/utils/PKGBUILD PKGBUILD
     done
 }
 
+# TODO fix this
 :add-package-fail() {
     local repo="$1"
     local epoch="$2"
