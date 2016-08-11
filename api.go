@@ -16,8 +16,8 @@ import (
 )
 
 type API struct {
-	repoRoot     string
-	repoOS string
+	repoRoot string
+	repoOS   string
 }
 
 type APIResponse struct {
@@ -28,10 +28,10 @@ type APIResponse struct {
 }
 
 const (
-	sliceKeyRepositories = "repositories"
-	sliceKeyEpoches      = "epoches"
-	sliceKeyPackages     = "packages"
-	sliceKeyPackage      = "package"
+	mapKeyRepositories = "repositories"
+	mapKeyEpoches      = "epoches"
+	mapKeyPackages     = "packages"
+	mapKeyPackage      = "package"
 
 	osArchLinux = "arch"
 	osUbuntu    = "ubuntu"
@@ -77,8 +77,8 @@ func (api *API) handleListRepositories(context *gin.Context) {
 	}
 
 	for _, repository := range repositories {
-		response.Data[sliceKeyRepositories] = append(
-			response.Data[sliceKeyRepositories], repository.Name(),
+		response.Data[mapKeyRepositories] = append(
+			response.Data[mapKeyRepositories], repository.Name(),
 		)
 	}
 
@@ -117,8 +117,8 @@ func (api *API) handleListEpoches(context *gin.Context) {
 	}
 
 	for _, epoch := range epoches {
-		response.Data[sliceKeyEpoches] = append(
-			response.Data[sliceKeyEpoches], epoch,
+		response.Data[mapKeyEpoches] = append(
+			response.Data[mapKeyEpoches], epoch,
 		)
 	}
 
@@ -141,7 +141,7 @@ func (api *API) handleListPackages(context *gin.Context) {
 	}
 
 	if repository != nil {
-		response.Data[sliceKeyPackages], err = repository.ListPackages()
+		response.Data[mapKeyPackages], err = repository.ListPackages()
 		if err != nil {
 			response.Status = http.StatusInternalServerError
 			response.Error = hierr.Errorf(
@@ -277,7 +277,7 @@ func (api *API) handleDescribePackage(context *gin.Context) {
 	}
 
 	if repository != nil {
-		response.Data[sliceKeyPackage], err = repository.DescribePackage(
+		response.Data[mapKeyPackage], err = repository.DescribePackage(
 			packageName,
 		)
 		if err != nil {

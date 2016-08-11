@@ -60,7 +60,7 @@ tests:clone tests/utils/PKGBUILD PKGBUILD
     local dir=$testdir/repositories/$repo/$epoch/$database/$architecture
 
     for package in $packages; do
-        cp $testdir/PKGBUILD $dir/
+        tests:ensure cp $testdir/PKGBUILD $dir/
 
         PKGDEST=$dir PKGNAME=$package \
             makepkg -p $testdir/PKGBUILD --clean --force
