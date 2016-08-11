@@ -82,29 +82,31 @@ func (arch *RepositoryArch) ListEpoches() ([]string, error) {
 func (arch *RepositoryArch) AddPackage(
 	packageName string, packageFile io.Reader, force bool,
 ) error {
-	packageFilePath := arch.getPackagesPath() + "/" + packageName
-
-	contentRaw, err := ioutil.ReadAll(packageFile)
-	if err != nil {
-		return hierr.Errorf(err, `can't read package file %s`, packageFile)
-	}
-
-	err = ioutil.WriteFile(
-		packageFilePath,
-		contentRaw,
-		permissionsPackageDefault,
+	dstPackageFile, err := os.Create(
+		filepath.Join(arch.getPackagesPath(), packageName),
 	)
 	if err != nil {
 		return err
 	}
 
-	cmd := exec.Command("gpg", "--detach-sign", "--yes", packageFilePath)
+	_, err = io.Copy(dstPackageFile, packageFile)
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command(
+		"gpg", "--detach-sign", "--yes", dstPackageFile.Name(),
+	)
 	_, _, err = executil.Run(cmd)
 	if err != nil {
 		return err
 	}
 
-	cmdOptions := []string{"-s", arch.getDatabaseFilePath(), packageFilePath}
+	cmdOptions := []string{
+		"-s",
+		arch.getDatabaseFilepath(),
+		dstPackageFile.Name(),
+	}
 	if !force {
 		cmdOptions = append([]string{"-n"}, cmdOptions...)
 	}
@@ -115,7 +117,10 @@ func (arch *RepositoryArch) AddPackage(
 	}
 
 	if !force && string(stderr) != "" {
-		return fmt.Errorf("can't add package that already exists in repo")
+		return hierr.Errorf(
+			fmt.Errorf("can't add package"),
+			`%s`, string(stderr),
+		)
 	}
 
 	return nil
@@ -123,7 +128,7 @@ func (arch *RepositoryArch) AddPackage(
 
 func (arch RepositoryArch) RemovePackage(packageName string) error {
 	cmd := exec.Command(
-		"repo-remove", arch.getDatabaseFilePath(), packageName,
+		"repo-remove", arch.getDatabaseFilepath(), packageName,
 	)
 	_, _, err := executil.Run(cmd)
 	if err != nil {
@@ -188,14 +193,19 @@ func (arch *RepositoryArch) getDatabaseFilename() string {
 	return arch.getDatabaseName() + ".db"
 }
 
-func (arch *RepositoryArch) getDatabaseFilePath() string {
-	return arch.getPackagesPath() + "/" +
-		arch.getDatabaseFilename() + ".tar.xz"
+func (arch *RepositoryArch) getDatabaseFilepath() string {
+	return filepath.Join(
+		arch.getPackagesPath(), arch.getDatabaseFilename()+".tar.xz",
+	)
 }
 
 func (arch RepositoryArch) getPackagesPath() string {
-	return arch.path + "/" + arch.epoch + "/" +
-		arch.database + "/" + arch.architecture
+	return filepath.Join(
+		arch.path,
+		arch.epoch,
+		arch.database,
+		arch.architecture,
+	)
 }
 
 func (arch *RepositoryArch) getTmpDirectory() (string, error) {
@@ -215,15 +225,15 @@ func (arch *RepositoryArch) prepareSyncDirectory(directory string) error {
 		return hierr.Errorf(err, "can't create dir %s", syncDirectoryPath)
 	}
 
-	targetLink := syncDirectoryPath + "/" + arch.getDatabaseFilename()
+	targetLink := filepath.Join(syncDirectoryPath, arch.getDatabaseFilename())
 	err = os.Symlink(
-		arch.getDatabaseFilePath(),
+		arch.getDatabaseFilepath(),
 		targetLink,
 	)
 	if err != nil {
 		return hierr.Errorf(
 			err,
-			"can't symlink %s to %s", arch.getDatabaseFilePath(), targetLink,
+			"can't symlink %s to %s", arch.getDatabaseFilepath(), targetLink,
 		)
 	}
 
@@ -273,7 +283,7 @@ func (arch *RepositoryArch) preparePacmanSyncDir() (string, string, error) {
 func (arch *RepositoryArch) GetPackageFile(
 	packageName string,
 ) (io.Reader, error) {
-	pattern := arch.getPackagesPath() + "/" + packageName
+	pattern := filepath.Join(arch.getPackagesPath(), packageName)
 
 	files, err := filepath.Glob(pattern)
 	if err != nil {

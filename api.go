@@ -17,7 +17,6 @@ import (
 
 type API struct {
 	repoRoot string
-	repoOS   string
 }
 
 type APIResponse struct {
@@ -35,8 +34,6 @@ const (
 
 	osArchLinux = "arch"
 	osUbuntu    = "ubuntu"
-
-	postFormPackageFile = "package_file"
 )
 
 func newAPI(repoRoot string) *API {
@@ -57,11 +54,11 @@ func (api *API) detectRepositoryOS(context *gin.Context) {
 	repository := context.Param("repo")
 
 	if strings.HasPrefix(repository, "arch") {
-		api.repoOS = osArchLinux
+		context.Set("os", osArchLinux)
 	}
 
 	if strings.HasPrefix(repository, "ubuntu") {
-		api.repoOS = osUbuntu
+		context.Set("os", osUbuntu)
 	}
 }
 
@@ -116,11 +113,7 @@ func (api *API) handleListEpoches(context *gin.Context) {
 		response.Error = fmt.Errorf("no epoches found for repo").Error()
 	}
 
-	for _, epoch := range epoches {
-		response.Data[mapKeyEpoches] = append(
-			response.Data[mapKeyEpoches], epoch,
-		)
-	}
+	response.Data[mapKeyEpoches] = epoches
 
 	api.sendResponse(context, response)
 }
@@ -240,22 +233,20 @@ func (api *API) handleEditPackage(context *gin.Context) {
 		).Error()
 	}
 
-	if repository != nil {
-		if epochNew != "" {
-			file, err = repository.GetPackageFile(packageName)
-			repository.SetEpoch(epochNew)
-		} else {
-			file, err = api.getFileFromRequest(request)
-		}
+	if epochNew != "" {
+		file, err = repository.GetPackageFile(packageName)
+		repository.SetEpoch(epochNew)
+	} else {
+		file, err = api.getFileFromRequest(request)
+	}
 
-		if err != nil {
-			response.Error = err.Error()
-		}
+	if err != nil {
+		response.Error = err.Error()
+	}
 
-		err = repository.EditPackage(packageName, file)
-		if err != nil {
-			response.Error = err.Error()
-		}
+	err = repository.EditPackage(packageName, file)
+	if err != nil {
+		response.Error = err.Error()
 	}
 
 	api.sendResponse(context, response)
@@ -291,6 +282,7 @@ func (api *API) handleDescribePackage(context *gin.Context) {
 func (api *API) sendResponse(context *gin.Context, response APIResponse) {
 	if response.Error != "" {
 		response.Success = false
+
 		if response.Status == 0 {
 			response.Status = http.StatusInternalServerError
 		}
@@ -317,7 +309,7 @@ func (api *API) newRepository(context *gin.Context) (Repository, error) {
 		architecture = context.Param("arch")
 	)
 
-	err := api.ensureRepositoryPaths(repoPath, epoch, database, architecture)
+	err := api.checkRepoPaths(repoPath, epoch, database, architecture)
 	if err != nil {
 		return nil, hierr.Errorf(
 			err,
@@ -326,7 +318,12 @@ func (api *API) newRepository(context *gin.Context) (Repository, error) {
 		)
 	}
 
-	switch api.repoOS {
+	repoOSValue := ""
+	if repoOS, ok := context.Get("os"); ok {
+		repoOSValue = repoOS.(string)
+	}
+
+	switch repoOSValue {
 	case osArchLinux:
 		return &RepositoryArch{
 			path:         repoPath,
@@ -334,12 +331,16 @@ func (api *API) newRepository(context *gin.Context) (Repository, error) {
 			database:     database,
 			architecture: architecture,
 		}, nil
-	}
 
-	return nil, fmt.Errorf("can't parse repository from request")
+	default:
+		return nil, fmt.Errorf(
+			"repo manager for %s is not implemented",
+			repoOSValue,
+		)
+	}
 }
 
-func (api *API) ensureRepositoryPaths(
+func (api *API) checkRepoPaths(
 	repo string, epoch string, database string, architecture string,
 ) error {
 	if _, err := os.Stat(repo); err != nil {
@@ -371,7 +372,7 @@ func (api *API) ensureRepositoryPaths(
 }
 
 func (api *API) getFileFromRequest(request *http.Request) (io.Reader, error) {
-	file, _, err := request.FormFile(postFormPackageFile)
+	file, _, err := request.FormFile("package_file")
 	if err != nil {
 		return nil, hierr.Errorf(err, "can't read form file from request")
 	}
