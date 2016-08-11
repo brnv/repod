@@ -13,7 +13,7 @@ tests:clone tests/utils/PKGBUILD PKGBUILD
 :run() {
     PATH=$PATH:$(tests:get-tmp-dir)/bin repod \
         --listen=":6333" \
-        --repos-dir=$(tests:get-tmp-dir)/repositories/
+        --root=$(tests:get-tmp-dir)/repositories/
 }
 
 :bootstrap-repository() {

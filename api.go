@@ -16,8 +16,8 @@ import (
 )
 
 type API struct {
-	repositoriesDir string
-	repositoryOS    string
+	repoRoot     string
+	repoOS string
 }
 
 type APIResponse struct {
@@ -39,9 +39,9 @@ const (
 	postFormPackageFile = "package_file"
 )
 
-func newAPI(repositoriesDir string) *API {
+func newAPI(repoRoot string) *API {
 	return &API{
-		repositoriesDir: repositoriesDir,
+		repoRoot: repoRoot,
 	}
 }
 
@@ -57,22 +57,22 @@ func (api *API) detectRepositoryOS(context *gin.Context) {
 	repository := context.Param("repo")
 
 	if strings.HasPrefix(repository, "arch") {
-		api.repositoryOS = osArchLinux
+		api.repoOS = osArchLinux
 	}
 
 	if strings.HasPrefix(repository, "ubuntu") {
-		api.repositoryOS = osUbuntu
+		api.repoOS = osUbuntu
 	}
 }
 
 func (api *API) handleListRepositories(context *gin.Context) {
 	response := newAPIResponse()
 
-	repositories, err := ioutil.ReadDir(api.repositoriesDir)
+	repositories, err := ioutil.ReadDir(api.repoRoot)
 	if err != nil {
 		response.Status = http.StatusInternalServerError
 		response.Error = hierr.Errorf(
-			err, "can't read repo dir %s", api.repositoriesDir,
+			err, "can't read repo dir %s", api.repoRoot,
 		).Error()
 	}
 
@@ -309,7 +309,7 @@ func (api *API) sendResponse(context *gin.Context, response APIResponse) {
 func (api *API) newRepository(context *gin.Context) (Repository, error) {
 	var (
 		repoPath = filepath.Join(
-			api.repositoriesDir,
+			api.repoRoot,
 			context.Param("repo"),
 		)
 		epoch        = context.Param("epoch")
@@ -326,7 +326,7 @@ func (api *API) newRepository(context *gin.Context) (Repository, error) {
 		)
 	}
 
-	switch api.repositoryOS {
+	switch api.repoOS {
 	case osArchLinux:
 		return &RepositoryArch{
 			path:         repoPath,

@@ -19,14 +19,14 @@ var usage = `repod - daemon to manage packages repository stored on host.
 
 Usage:
 	repod -h | --help
-	repod [--listen=<url>] [--repos-dir=<path>]
+	repod [--listen=<url>] [--root=<path>]
 
 Options:
-    -h --help           Show this help.
-    --listen=<url>      Address to listen requests to.
-                         [default: :6333]
-    --repos-dir=<path>  Specify directory where repos stored.
-                         [default: /srv/http]
+    -h --help       Show this help.
+    --listen=<url>  Address to listen requests to.
+                     [default: :6333]
+    --root=<path>   Specify directory where repos stored.
+                     [default: /srv/http]
 `
 
 func main() {
@@ -36,10 +36,10 @@ func main() {
 	}
 
 	var (
-		repositoriesDir = args["--repos-dir"].(string)
-		listenAddress   = args["--listen"].(string)
+		repoRoot      = args["--root"].(string)
+		listenAddress = args["--listen"].(string)
 
-		api    = newAPI(repositoriesDir)
+		api    = newAPI(repoRoot)
 		router = gin.New()
 	)
 
