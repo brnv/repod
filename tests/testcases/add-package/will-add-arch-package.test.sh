@@ -1,5 +1,3 @@
-#!/bin/bash
-
 :bootstrap-repository arch-repo testing testing-db x86_64
 
 tests:run-background bg_repod :run

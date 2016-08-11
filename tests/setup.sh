@@ -96,6 +96,17 @@ tests:clone tests/utils/PKGBUILD PKGBUILD
     done
 }
 
+:stat-package() {
+    local repo="$1"
+    local epoch="$2"
+    local database="$3"
+    local architecture="$4"
+    local package="$5"
+    local repodir="$(tests:get-tmp-dir)/repositories"
+
+    stat $repodir/$repo/$epoch/$database/$architecture/$package
+}
+
 :remove-package() {
     local repo="$1"
     local epoch="$2"

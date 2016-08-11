@@ -135,7 +135,12 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 		return err
 	}
 
-	// TODO: remove file from filesystem
+	packageFile := filepath.Join(arch.getPackagesPath(), packageName)
+
+	err = os.Remove(packageFile)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

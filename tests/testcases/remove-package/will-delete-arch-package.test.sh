@@ -1,5 +1,3 @@
-#!/bin/bash
-
 :bootstrap-repository arch-repo testing testing-db x86_64
 
 tests:run-background bg_repod :run
@@ -18,6 +16,8 @@ actual=$(:list-packages arch-repo testing testing-db x86_64)
 tests:assert-equals "$actual" "$expected"
 tests:assert-success
 
+tests:ensure :stat-package arch-repo testing testing-db x86_64 package_one
+
 :remove-package arch-repo testing testing-db x86_64 package_one
 
 expected='Success = true
@@ -30,3 +30,6 @@ actual=$(:list-packages arch-repo testing testing-db x86_64)
 
 tests:assert-equals "$actual" "$expected"
 tests:assert-success
+
+tests:not tests:ensure :stat-package \
+    arch-repo testing testing-db x86_64 package_one
