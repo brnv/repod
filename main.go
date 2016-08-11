@@ -1,8 +1,8 @@
 package main
 
 import (
-	docopt "github.com/docopt/docopt-go"
 	"github.com/gin-gonic/gin"
+	"github.com/kovetskiy/godocs"
 )
 
 var version = "1.0"
@@ -30,10 +30,7 @@ Options:
 `
 
 func main() {
-	args, err := docopt.Parse(usage, nil, true, "repod "+version, false)
-	if err != nil {
-		panic(err)
-	}
+	args := godocs.MustParse(usage, version, godocs.UsePager)
 
 	var (
 		repoRoot      = args["--root"].(string)
