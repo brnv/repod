@@ -47,28 +47,24 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 	)
 	pacmanOutput, _, err := executil.Run(cmd)
 	if err != nil {
-		return []string{}, hierr.Errorf(err, `can't execute command %s`, cmd)
+		return []string{}, hierr.Errorf(
+			err,
+			`can't execute command %s`, cmd,
+		)
 	}
 
-	var (
-		outputLines = strings.Split(string(pacmanOutput), "\n")
-		packages    = []string{}
-	)
-	for _, outputLine := range outputLines {
-		if outputLine == "" {
-			continue
-		}
+	packages := strings.Split(string(pacmanOutput), "\n")
 
-		packages = append(packages, outputLine)
-	}
-
-	return packages, nil
+	return packages[:len(packages)-1], nil
 }
 
 func (arch *RepositoryArch) ListEpoches() ([]string, error) {
 	epochFiles, err := ioutil.ReadDir(arch.path)
 	if err != nil {
-		return []string{}, hierr.Errorf(err, `can't read dir %s`, arch.path)
+		return []string{}, hierr.Errorf(
+			err,
+			`can't read dir %s`, arch.path,
+		)
 	}
 
 	epoches := []string{}
@@ -147,10 +143,10 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 
 func (arch RepositoryArch) DescribePackage(
 	packageName string,
-) ([]string, error) {
+) (string, error) {
 	directory, config, err := arch.preparePacmanSyncDir()
 	if err != nil {
-		return []string{}, err
+		return "", err
 	}
 	defer func() {
 		os.RemoveAll(directory)
@@ -165,18 +161,10 @@ func (arch RepositoryArch) DescribePackage(
 	)
 	pacmanOutput, _, err := executil.Run(cmd)
 	if err != nil {
-		return []string{}, err
+		return "", err
 	}
 
-	var (
-		outputLines = strings.Split(string(pacmanOutput), "\n")
-		packageInfo = []string{}
-	)
-	for _, outputLine := range outputLines {
-		packageInfo = append(packageInfo, outputLine)
-	}
-
-	return packageInfo, nil
+	return string(pacmanOutput), nil
 }
 
 func (arch *RepositoryArch) EditPackage(

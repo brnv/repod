@@ -22,7 +22,7 @@ type API struct {
 type APIResponse struct {
 	Success bool
 	Error   string
-	Data    map[string][]string
+	Data    map[string]interface{}
 	Status  int
 }
 
@@ -44,7 +44,7 @@ func newAPI(repoRoot string) *API {
 
 func newAPIResponse() APIResponse {
 	return APIResponse{
-		Data:    make(map[string][]string),
+		Data:    make(map[string]interface{}),
 		Status:  http.StatusOK,
 		Success: true,
 	}
@@ -65,7 +65,7 @@ func (api *API) detectRepositoryOS(context *gin.Context) {
 func (api *API) handleListRepositories(context *gin.Context) {
 	response := newAPIResponse()
 
-	repositories, err := ioutil.ReadDir(api.repoRoot)
+	repositoriesFileInfo, err := ioutil.ReadDir(api.repoRoot)
 	if err != nil {
 		response.Status = http.StatusInternalServerError
 		response.Error = hierr.Errorf(
@@ -73,11 +73,13 @@ func (api *API) handleListRepositories(context *gin.Context) {
 		).Error()
 	}
 
-	for _, repository := range repositories {
-		response.Data[mapKeyRepositories] = append(
-			response.Data[mapKeyRepositories], repository.Name(),
-		)
+	repositories := []string{}
+
+	for _, repository := range repositoriesFileInfo {
+		repositories = append(repositories, repository.Name())
 	}
+
+	response.Data[mapKeyRepositories] = repositories
 
 	api.sendResponse(context, response)
 }
@@ -122,6 +124,7 @@ func (api *API) handleListPackages(context *gin.Context) {
 	var (
 		err      error
 		response = newAPIResponse()
+		packages []string
 	)
 
 	repository, err := api.newRepository(context)
@@ -134,7 +137,7 @@ func (api *API) handleListPackages(context *gin.Context) {
 	}
 
 	if repository != nil {
-		response.Data[mapKeyPackages], err = repository.ListPackages()
+		packages, err = repository.ListPackages()
 		if err != nil {
 			response.Status = http.StatusInternalServerError
 			response.Error = hierr.Errorf(
@@ -143,6 +146,8 @@ func (api *API) handleListPackages(context *gin.Context) {
 			).Error()
 		}
 	}
+
+	response.Data[mapKeyPackages] = packages
 
 	api.sendResponse(context, response)
 }
