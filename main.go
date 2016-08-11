@@ -3,9 +3,13 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/kovetskiy/godocs"
+	"github.com/kovetskiy/lorg"
 )
 
-var version = "1.0"
+var (
+	logger  = lorg.NewLog()
+	version = "1"
+)
 
 const (
 	urlListEpoches       = "/:repo"
@@ -40,7 +44,7 @@ func main() {
 		router = gin.New()
 	)
 
-	router.Use(gin.Logger(), gin.Recovery(), api.detectRepositoryOS)
+	router.Use(getRouterRecovery(), getRouterLogger(), api.detectRepositoryOS)
 
 	v1 := router.Group("/v1/")
 	{
