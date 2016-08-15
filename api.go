@@ -3,12 +3,10 @@ package main
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kovetskiy/toml"
@@ -31,9 +29,6 @@ const (
 	mapKeyEpoches      = "epoches"
 	mapKeyPackages     = "packages"
 	mapKeyPackage      = "package"
-
-	osArchLinux = "arch"
-	osUbuntu    = "ubuntu"
 )
 
 func newAPI(repoRoot string) *API {
@@ -51,32 +46,19 @@ func newAPIResponse() APIResponse {
 }
 
 func (api *API) detectRepositoryOS(context *gin.Context) {
-	repository := context.Param("repo")
-
-	if strings.HasPrefix(repository, "arch") {
-		context.Set("os", osArchLinux)
-	}
-
-	if strings.HasPrefix(repository, "ubuntu") {
-		context.Set("os", osUbuntu)
-	}
+	repository := detectRepositoryOS(context.Param("repo"))
+	context.Set("os", repository)
 }
 
 func (api *API) handleListRepositories(context *gin.Context) {
 	response := newAPIResponse()
 
-	repositoriesFileInfo, err := ioutil.ReadDir(api.repoRoot)
+	repositories, err := listRepositories(api.repoRoot)
 	if err != nil {
 		response.Status = http.StatusInternalServerError
 		response.Error = hierr.Errorf(
 			err, "can't read repo dir %s", api.repoRoot,
 		).Error()
-	}
-
-	repositories := []string{}
-
-	for _, repository := range repositoriesFileInfo {
-		repositories = append(repositories, repository.Name())
 	}
 
 	response.Data[mapKeyRepositories] = repositories
@@ -242,7 +224,7 @@ func (api *API) handleEditPackage(context *gin.Context) {
 		file, err = repository.GetPackageFile(packageName)
 		repository.SetEpoch(epochNew)
 	} else {
-		file, err = api.getFileFromRequest(request)
+		file, err = api.getFileFromRequest(context.Request)
 	}
 
 	if err != nil {
@@ -328,21 +310,7 @@ func (api *API) newRepository(context *gin.Context) (Repository, error) {
 		repoOSValue = repoOS.(string)
 	}
 
-	switch repoOSValue {
-	case osArchLinux:
-		return &RepositoryArch{
-			path:         repoPath,
-			epoch:        epoch,
-			database:     database,
-			architecture: architecture,
-		}, nil
-
-	default:
-		return nil, fmt.Errorf(
-			"repo manager for %s is not implemented",
-			repoOSValue,
-		)
-	}
+	return getRepository(repoOSValue, repoPath, epoch, database, architecture)
 }
 
 func (api *API) checkRepoPaths(
