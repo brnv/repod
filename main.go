@@ -57,12 +57,6 @@ func main() {
 	var (
 		repoRoot = args["--root"].(string)
 
-		actionList   = args["--list"].(bool)
-		actionAdd    = args["--add"].(bool)
-		actionShow   = args["--show"].(bool)
-		actionEdit   = args["--edit"].(bool)
-		actionRemove = args["--remove"].(bool)
-
 		repo, _        = args["<repo>"].(string)
 		epoch, _       = args["<epoch>"].(string)
 		db, _          = args["<db>"].(string)
@@ -74,55 +68,53 @@ func main() {
 
 		listenAddress, _ = args["--listen"].(string)
 
-		err    error
-		output string
+		err        error
+		output     string
+		repository Repository
 	)
 
 	if listenAddress != "" {
 		runDaemon(repoRoot, listenAddress)
 	}
 
-	if actionList && repo == "" {
+	if args["--list"].(bool) && repo == "" {
 		output, err = getListRepositoriesOutput(repoRoot)
+	} else {
+		repository, err = getRepository(repo, repoRoot, epoch, db, arch)
 		if err != nil {
 			fatalf("%s", err)
 		}
 	}
 
-	repository, err := getRepository(repo, repoRoot, epoch, db, arch)
-	if err != nil {
-		fatalf("%s", err)
-	}
+	switch {
+	case args["--list"].(bool):
+		if repo != "" {
+			output, err = getListEpochesOutput(repoRoot, repository)
+		}
 
-	if actionList && repo != "" {
-		output, err = getListEpochesOutput(repoRoot, repository)
-	}
+		if repo != "" && arch != "" {
+			output, err = getListPackagesOutput(repoRoot, repository)
+		}
 
-	if actionList && repo != "" && arch != "" {
-		output, err = getListPackagesOutput(repoRoot, repository)
-	}
-
-	if actionAdd {
+	case args["--add"].(bool):
 		output, err = getAddPackageOutput(
 			repoRoot, repository, packageName, packageFile,
 		)
-	}
 
-	if actionShow {
+	case args["--show"].(bool):
 		output, err = getDescribePackageOutput(
 			repoRoot, repository, packageName,
 		)
-	}
 
-	if actionEdit {
+	case args["--edit"].(bool):
 		output, err = getEditPackageOutput(
 			repoRoot, repository, packageName,
 			packageFile, epochToChange,
 		)
-	}
 
-	if actionRemove {
+	case args["--remove"].(bool):
 		err = repository.RemovePackage(packageName)
+
 	}
 
 	if err != nil {
