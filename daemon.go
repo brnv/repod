@@ -7,7 +7,7 @@ func runDaemon(repoRoot string, listenAddress string) {
 
 	router := gin.New()
 
-	router.Use(getRouterRecovery(), getRouterLogger(), api.detectRepositoryOS)
+	router.Use(getRouterRecovery(), getRouterLogger())
 
 	v1 := router.Group("/v1/")
 	{

@@ -45,11 +45,6 @@ func newAPIResponse() APIResponse {
 	}
 }
 
-func (api *API) detectRepositoryOS(context *gin.Context) {
-	repository := detectRepositoryOS(context.Param("repo"))
-	context.Set("os", repository)
-}
-
 func (api *API) handleListRepositories(context *gin.Context) {
 	response := newAPIResponse()
 
@@ -287,33 +282,26 @@ func (api *API) sendResponse(context *gin.Context, response APIResponse) {
 
 func (api *API) newRepository(context *gin.Context) (Repository, error) {
 	var (
-		repoPath = filepath.Join(
-			api.repoRoot,
-			context.Param("repo"),
-		)
+		repo         = context.Param("repo")
+		repoPath     = filepath.Join(api.repoRoot, repo)
 		epoch        = context.Param("epoch")
 		database     = context.Param("db")
 		architecture = context.Param("arch")
 	)
 
-	err := api.checkRepoPaths(repoPath, epoch, database, architecture)
+	err := api.validateRepoPaths(repoPath, epoch, database, architecture)
 	if err != nil {
 		return nil, hierr.Errorf(
 			err,
-			"can't ensure repo paths: %s/%s/%s/%s",
+			"can't validate repo paths: %s/%s/%s/%s",
 			repoPath, epoch, database, architecture,
 		)
 	}
 
-	repoOSValue := ""
-	if repoOS, ok := context.Get("os"); ok {
-		repoOSValue = repoOS.(string)
-	}
-
-	return getRepository(repoOSValue, repoPath, epoch, database, architecture)
+	return getRepository(repo, api.repoRoot, epoch, database, architecture)
 }
 
-func (api *API) checkRepoPaths(
+func (api *API) validateRepoPaths(
 	repo string, epoch string, database string, architecture string,
 ) error {
 	if _, err := os.Stat(repo); err != nil {
