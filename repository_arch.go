@@ -107,7 +107,9 @@ func (arch *RepositoryArch) AddPackage(
 		cmdOptions = append([]string{"-n"}, cmdOptions...)
 	}
 
-	_, stderr, err := executil.Run(exec.Command("repo-add", cmdOptions...))
+	_, stderr, err := executil.Run(
+		exec.Command("repo-add", cmdOptions...),
+	)
 	if err != nil {
 		return err
 	}

@@ -129,5 +129,5 @@ func getEditPackageOutput(
 		return "", err
 	}
 
-	return "package was successfully added", nil
+	return "package was successfully edited", nil
 }

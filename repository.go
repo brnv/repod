@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 	"strings"
 )
 
@@ -37,8 +38,13 @@ func detectRepositoryOS(repository string) string {
 }
 
 func getRepository(
-	osType string, repoPath string, epoch string, database string, architecture string,
+	repo string, repoRoot string, epoch string, database string, architecture string,
 ) (Repository, error) {
+	var (
+		osType   = detectRepositoryOS(repo)
+		repoPath = filepath.Join(repoRoot, repo)
+	)
+
 	switch osType {
 	case osArchLinux:
 		return &RepositoryArch{

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/kovetskiy/godocs"
 	"github.com/kovetskiy/lorg"
@@ -23,7 +22,7 @@ const (
 	urlManipulatePackage = urlListPackages + "/:package"
 )
 
-var usage = `repod - daemon to manage packages repository stored on host.
+var usage = `repod, packages repository manager
 
 Usage:
     repod -h | --help
@@ -34,22 +33,22 @@ Usage:
     repod [options] (-A|-S|-E|-R) <repo> <epoch> <db> <arch> <package>
 
 Options:
-    --root=<path>            Specify directory where repos stored.
-                              [default: /srv/http]
-    --listen <address>       Address to listen requests to.
-    -L --list                List repositories or repository packages.
-    -A --add                 Add package to specified repository.
-    -S --show                Show package information.
-    -E --edit                Edit package in specified repository.
-    -R --remove              Remove package from specified repository.
-      <repo>                 Specify repository name.
-      <epoch>                Specify repository epoch.
-      <db>                   Specify repository db.
-      <arch>                 Specify repository architecture.
-      <package>              Specify package to manipulate with.
-     --file=<path>           Package file to add or edit in repository.
-     --change-epoch=<epoch>  Package file to add or edit in repository.
-    -h --help                Show this help.
+    --root <path>             Directory where repositories stored
+                               [default: /srv/http].
+    --listen <address>        Listen specified IP and port.
+    -L --list                 List packages, epoches or repositories.
+    -A --add                  Add package.
+    -S --show                 Describe package.
+    -E --edit                 Edit package file, epoch or description.
+    -R --remove               Remove package.
+      <repo>                  Target repository name.
+      <epoch>                 Target repository epoch.
+      <db>                    Target repository database.
+      <arch>                  Target repository architecture.
+      <package>               Target package to manipulate with.
+      --file <path>           Specify file to be upload to repository.
+      --change-epoch <epoch>  Specify epoch to copy package to.
+    -h --help                 Show this help.
 `
 
 func main() {
@@ -90,45 +89,29 @@ func main() {
 		}
 	}
 
-	osType := detectRepositoryOS(repo)
-
-	repoPath := filepath.Join(repoRoot, repo)
-
-	repository, err := getRepository(osType, repoPath, epoch, db, arch)
+	repository, err := getRepository(repo, repoRoot, epoch, db, arch)
 	if err != nil {
 		fatalf("%s", err)
 	}
 
 	if actionList && repo != "" {
 		output, err = getListEpochesOutput(repoRoot, repository)
-		if err != nil {
-			fatalf("%s", err)
-		}
 	}
 
 	if actionList && repo != "" && arch != "" {
 		output, err = getListPackagesOutput(repoRoot, repository)
-		if err != nil {
-			fatalf("%s", err)
-		}
 	}
 
 	if actionAdd {
 		output, err = getAddPackageOutput(
 			repoRoot, repository, packageName, packageFile,
 		)
-		if err != nil {
-			fatalf("%s", err)
-		}
 	}
 
 	if actionShow {
 		output, err = getDescribePackageOutput(
 			repoRoot, repository, packageName,
 		)
-		if err != nil {
-			fatalf("%s", err)
-		}
 	}
 
 	if actionEdit {
@@ -136,16 +119,14 @@ func main() {
 			repoRoot, repository, packageName,
 			packageFile, epochToChange,
 		)
-		if err != nil {
-			fatalf("%s", err)
-		}
 	}
 
 	if actionRemove {
 		err = repository.RemovePackage(packageName)
-		if err != nil {
-			fatalf("%s", err)
-		}
+	}
+
+	if err != nil {
+		fatalf("%s", err)
 	}
 
 	fmt.Print(output)
