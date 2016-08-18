@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/kovetskiy/godocs"
 	"github.com/kovetskiy/lorg"
@@ -82,7 +83,9 @@ func main() {
 	}
 
 	if args["--list"].(bool) && repo == "" {
-		output, err = getListRepositoriesOutput(repoRoot)
+		repos := []string{}
+		repos, err = listRepositories(repoRoot)
+		output = strings.Join(repos, "\n")
 	} else {
 		repository, err = getRepository(repo, repoRoot, epoch, db, arch)
 		if err != nil {
@@ -93,25 +96,25 @@ func main() {
 	switch {
 	case args["--list"].(bool):
 		if repo != "" {
-			output, err = getListEpochesOutput(repoRoot, repository)
+			output, err = listEpoches(repoRoot, repository)
 		}
 
 		if repo != "" && arch != "" {
-			output, err = getListPackagesOutput(repoRoot, repository)
+			output, err = listPackages(repoRoot, repository)
 		}
 
 	case args["--add"].(bool):
-		output, err = getAddPackageOutput(
+		output, err = addPackage(
 			repoRoot, repository, packageName, packageFile,
 		)
 
 	case args["--show"].(bool):
-		output, err = getDescribePackageOutput(
+		output, err = describePackage(
 			repoRoot, repository, packageName,
 		)
 
 	case args["--edit"].(bool):
-		output, err = getEditPackageOutput(
+		output, err = editPackage(
 			repoRoot, repository, packageName,
 			packageFile, epochToChange,
 		)

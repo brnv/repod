@@ -3,29 +3,31 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 
 	"github.com/kovetskiy/hierr"
 )
 
-func getListRepositoriesOutput(repoRoot string) (string, error) {
-	repositories, err := listRepositories(repoRoot)
+func listRepositories(repoRoot string) ([]string, error) {
+	repositoriesFileInfo, err := ioutil.ReadDir(repoRoot)
 	if err != nil {
-		return "", hierr.Errorf(
+		return []string{}, hierr.Errorf(
 			err,
 			`can't list repositories from root %s`, repoRoot,
 		)
 	}
 
-	if len(repositories) == 0 {
-		return "", fmt.Errorf("no repos found", nil)
+	repositories := []string{}
+	for _, repository := range repositoriesFileInfo {
+		repositories = append(repositories, repository.Name())
 	}
 
-	return strings.Join(repositories, "\n"), nil
+	return repositories, nil
 }
 
-func getListEpochesOutput(
+func listEpoches(
 	repoRoot string,
 	repository Repository,
 ) (string, error) {
@@ -44,7 +46,7 @@ func getListEpochesOutput(
 	return strings.Join(epoches, "\n"), nil
 }
 
-func getListPackagesOutput(
+func listPackages(
 	repoRoot string,
 	repository Repository,
 ) (string, error) {
@@ -63,7 +65,7 @@ func getListPackagesOutput(
 	return strings.Join(packages, "\n"), nil
 }
 
-func getAddPackageOutput(
+func addPackage(
 	repoRoot string, repository Repository,
 	packageName string, packageFile string,
 ) (string, error) {
@@ -86,7 +88,7 @@ func getAddPackageOutput(
 	return "package was successfully added", nil
 }
 
-func getDescribePackageOutput(
+func describePackage(
 	repoRoot string, repository Repository, packageName string,
 ) (string, error) {
 	description, err := repository.DescribePackage(packageName)
@@ -100,7 +102,7 @@ func getDescribePackageOutput(
 	return description, nil
 }
 
-func getEditPackageOutput(
+func editPackage(
 	repoRoot string, repository Repository,
 	packageName string, packageFile string,
 	epochToChange string,

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"path/filepath"
 	"strings"
 )
@@ -64,18 +63,4 @@ func getRepository(
 			osType,
 		)
 	}
-}
-
-func listRepositories(root string) ([]string, error) {
-	repositoriesFileInfo, err := ioutil.ReadDir(root)
-	if err != nil {
-		return []string{}, err
-	}
-
-	repositories := []string{}
-	for _, repository := range repositoriesFileInfo {
-		repositories = append(repositories, repository.Name())
-	}
-
-	return repositories, nil
 }
