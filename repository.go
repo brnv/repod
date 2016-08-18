@@ -38,7 +38,11 @@ func detectRepositoryOS(repository string) string {
 }
 
 func getRepository(
-	repo string, repoRoot string, epoch string, database string, architecture string,
+	repo string,
+	repoRoot string,
+	epoch string,
+	database string,
+	architecture string,
 ) (Repository, error) {
 	var (
 		osType   = detectRepositoryOS(repo)

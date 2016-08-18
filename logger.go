@@ -6,7 +6,6 @@ import (
 )
 
 const (
-	loggerFormat       = "${time} ${level:[%s]:right:short} %s"
 	loggerFormatLength = 28
 )
 

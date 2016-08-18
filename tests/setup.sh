@@ -116,8 +116,8 @@ api_url="$_repod/v1"
                 --file=$dir/$package-1-1-$architecture.pkg.tar.xz
         else
             :curl -F \
-                package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz -XPOST \
-                $api_url/$repo/$epoch/$database/$architecture/$package
+                package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz \
+                -XPOST $api_url/$repo/$epoch/$database/$architecture/$package
         fi
     done
 }
@@ -143,11 +143,13 @@ api_url="$_repod/v1"
             makepkg -p $testdir/PKGBUILD --clean --force
 
         if [[ $run_method == "local" ]]; then
-            :run-local --add unknown_repo $epoch $database $architecture $package \
+            :run-local \
+                --add unknown_repo $epoch $database $architecture $package \
                 --file=$dir/$package-1-1-$architecture.pkg.tar.xz
         else
             :curl -F \
-                package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz -XPOST \
+                package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz \
+                -XPOST \
                 $api_url/unknown_repo/$epoch/$database/$architecture/$package
         fi
     done

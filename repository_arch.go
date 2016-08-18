@@ -20,11 +20,7 @@ type RepositoryArch struct {
 	architecture string
 }
 
-const (
-	formatPacmanConfRepo = "[%s]"
-
-	permissionsPackageDefault = 0644
-)
+const formatPacmanConfRepo = "[%s]"
 
 func (arch RepositoryArch) ListPackages() ([]string, error) {
 	directory, config, err := arch.preparePacmanSyncDir()
@@ -45,6 +41,7 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 		"--config", config,
 		"--dbpath", directory,
 	)
+
 	pacmanOutput, _, err := executil.Run(cmd)
 	if err != nil {
 		return []string{}, hierr.Errorf(

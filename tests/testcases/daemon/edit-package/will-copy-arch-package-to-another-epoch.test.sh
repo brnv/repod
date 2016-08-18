@@ -16,7 +16,8 @@ tests:assert-equals "$actual" "$expected"
 
 :bootstrap-repository arch-repo stable arch-repo x86_64
 
-:copy-package-to-epoch curl arch-repo testing arch-repo x86_64 package_one stable
+:copy-package-to-epoch \
+    curl arch-repo testing arch-repo x86_64 package_one stable
 
 expected='Success = true
 Error = ""
