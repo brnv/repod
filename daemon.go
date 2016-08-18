@@ -2,14 +2,28 @@ package main
 
 import "github.com/gin-gonic/gin"
 
-func runDaemon(repoRoot string, listenAddress string) {
-	api := newAPI(repoRoot)
+func runDaemon(
+	repoRoot string,
+	listenAddress string,
+	nucleusAddress string,
+	tlsCert string,
+) {
+	var (
+		auth = NucleusAuth{
+			Address: nucleusAddress,
+		}
+		api    = newAPI(repoRoot)
+		router = gin.New()
+	)
 
-	router := gin.New()
+	err := auth.AddCertificateFile(tlsCert)
+	if err != nil {
+		fatalf("%s", err)
+	}
 
 	router.Use(getRouterRecovery(), getRouterLogger())
 
-	v1 := router.Group("/v1/")
+	v1 := router.Group("/v1/", api.handleAuthentificate)
 	{
 		v1.Handle(
 			"GET", "/",

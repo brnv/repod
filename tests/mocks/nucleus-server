@@ -1,0 +1,10 @@
+#!/bin/bash
+
+cat <<OUT
+200 OK
+
+{
+    "username": "user",
+    "create_date": 12345
+}
+OUT

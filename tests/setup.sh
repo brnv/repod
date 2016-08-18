@@ -1,20 +1,39 @@
-#!/bin/bash
-
-api_url="http://localhost:6333/v1"
-
 :curl() {
-    /bin/curl -s ${@}
+    /bin/curl -s -u user:valid ${@}
 }
 
 tests:clone repod.test bin/
 tests:clone tests/mocks/gpg bin/gpg
 tests:clone tests/utils/PKGBUILD PKGBUILD
+tests:clone tests/mocks/nucleus-server .
+
+_repod="127.0.0.1:64444"
+_nucleus="127.0.0.1:64777"
+
+api_url="$_repod/v1"
+
+:nucleus() {
+    tests:make-tmp-dir nucleus
+
+    local pid=""
+    tests:value pid blankd \
+        -d $(tests:get-tmp-dir)/nucleus/ \
+        -e $(tests:get-tmp-dir)/nucleus-server \
+        -l "$_nucleus" \
+        --tls
+
+    tests:put-string blankd.pid "$pid"
+}
 
 :run-daemon() {
+    :nucleus
+
     tests:eval go-test:run \
         repod.test \
-        --listen=":6333" \
-        --root=$(tests:get-tmp-dir)/repositories/
+        --listen="$_repod" \
+        --root=$(tests:get-tmp-dir)/repositories/ \
+        --nucleus "$_nucleus" \
+        --tls-cert $(tests:get-tmp-dir)/nucleus/tls.crt
 }
 
 :run-local() {

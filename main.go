@@ -26,7 +26,7 @@ var usage = `repod, packages repository manager
 
 Usage:
     repod -h | --help
-    repod [options] --listen <address>
+    repod [options] --listen <address> --nucleus <address> --tls-cert <path>
     repod [options] -L
     repod [options] -L <repo>
     repod [options] -L <repo> <epoch> <db> <arch>
@@ -36,6 +36,8 @@ Options:
     --root <path>             Directory where repositories stored
                                [default: /srv/http].
     --listen <address>        Listen specified IP and port.
+    --nucleus <address>       Nucleus server address.
+    --tls-cert <path>         Path to nucleus ssl certificate file.
     -L --list                 List packages, epoches or repositories.
     -A --add                  Add package.
     -S --show                 Describe package.
@@ -66,7 +68,9 @@ func main() {
 
 		epochToChange, _ = args["--change-epoch"].(string)
 
-		listenAddress, _ = args["--listen"].(string)
+		listenAddress, _  = args["--listen"].(string)
+		nucleusAddress, _ = args["--nucleus"].(string)
+		tlsCert, _        = args["--tls-cert"].(string)
 
 		err        error
 		output     string
@@ -74,7 +78,7 @@ func main() {
 	)
 
 	if listenAddress != "" {
-		runDaemon(repoRoot, listenAddress)
+		runDaemon(repoRoot, listenAddress, nucleusAddress, tlsCert)
 	}
 
 	if args["--list"].(bool) && repo == "" {

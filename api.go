@@ -11,6 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kovetskiy/toml"
 	"github.com/reconquest/hierr"
+
+	nucleus "git.rn/devops/nucleus-go"
 )
 
 type API struct {
@@ -259,6 +261,27 @@ func (api *API) handleDescribePackage(context *gin.Context) {
 	}
 
 	api.sendResponse(context, response)
+}
+
+func (api *API) handleAuthentificate(context *gin.Context) {
+	_, token, ok := context.Request.BasicAuth()
+	if !ok {
+		context.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	user, err := nucleus.Authenticate(token)
+	if err != nil {
+		errorln(
+			hierr.Errorf(
+				err, "can't authentificate using token '%s'", token,
+			),
+		)
+		context.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	context.Set("username", user.Name)
 }
 
 func (api *API) sendResponse(context *gin.Context, response APIResponse) {
