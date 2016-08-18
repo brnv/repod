@@ -13,7 +13,6 @@ type Repository interface {
 	AddPackage(packageName string, file io.Reader, force bool) error
 	RemovePackage(packageName string) error
 	DescribePackage(packageName string) (string, error)
-	EditPackage(packageName string, file io.Reader) error
 	GetPackageFile(packageName string) (io.Reader, error)
 	SetEpoch(epoch string)
 }

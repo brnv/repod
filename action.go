@@ -126,7 +126,7 @@ func editPackage(
 		}
 	}
 
-	err = repository.EditPackage(packageName, file)
+	err = repository.AddPackage(packageName, file, true)
 	if err != nil {
 		return "", err
 	}

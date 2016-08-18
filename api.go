@@ -228,7 +228,7 @@ func (api *API) handleEditPackage(context *gin.Context) {
 		response.Error = err.Error()
 	}
 
-	err = repository.EditPackage(packageName, file)
+	err = repository.AddPackage(packageName, file, true)
 	if err != nil {
 		response.Error = err.Error()
 	}

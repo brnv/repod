@@ -166,17 +166,6 @@ func (arch RepositoryArch) DescribePackage(
 	return string(pacmanOutput), nil
 }
 
-func (arch *RepositoryArch) EditPackage(
-	packageName string, file io.Reader,
-) error {
-	err := arch.AddPackage(packageName, file, true)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (arch *RepositoryArch) getDatabaseName() string {
 	return arch.database + "-" + arch.epoch
 }
