@@ -17,6 +17,7 @@ import (
 
 type API struct {
 	repoRoot string
+	authNeed bool
 }
 
 type APIResponse struct {
@@ -101,9 +102,9 @@ func (api *API) handleListEpoches(context *gin.Context) {
 
 func (api *API) handleListPackages(context *gin.Context) {
 	var (
-		err      error
 		response = newAPIResponse()
 		packages []string
+		err      error
 	)
 
 	repository, err := api.newRepository(context)
@@ -133,11 +134,11 @@ func (api *API) handleListPackages(context *gin.Context) {
 
 func (api *API) handleAddPackage(context *gin.Context) {
 	var (
-		err      error
-		response = newAPIResponse()
 		request  = context.Request
+		response = newAPIResponse()
 		file     io.Reader
 		filename string
+		err      error
 	)
 
 	repository, err := api.newRepository(context)
@@ -174,9 +175,9 @@ func (api *API) handleAddPackage(context *gin.Context) {
 
 func (api *API) handleRemovePackage(context *gin.Context) {
 	var (
-		err         error
 		response    = newAPIResponse()
 		packageName = context.Param("package")
+		err         error
 	)
 
 	repository, err := api.newRepository(context)
@@ -199,12 +200,12 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 
 func (api *API) handleEditPackage(context *gin.Context) {
 	var (
-		err         error
-		response    = newAPIResponse()
 		request     = context.Request
 		packageName = context.Param("package")
+		response    = newAPIResponse()
 		file        io.Reader
 		filename    string
+		err         error
 	)
 
 	request.ParseForm()
@@ -271,6 +272,10 @@ func (api *API) handleDescribePackage(context *gin.Context) {
 }
 
 func (api *API) handleAuthentificate(context *gin.Context) {
+	if !api.authNeed {
+		return
+	}
+
 	_, token, ok := context.Request.BasicAuth()
 	if !ok {
 		context.AbortWithStatus(http.StatusUnauthorized)
@@ -313,10 +318,10 @@ func (api *API) sendResponse(context *gin.Context, response APIResponse) {
 func (api *API) newRepository(context *gin.Context) (Repository, error) {
 	var (
 		repo         = context.Param("repo")
-		repoPath     = filepath.Join(api.repoRoot, repo)
 		epoch        = context.Param("epoch")
 		database     = context.Param("db")
 		architecture = context.Param("arch")
+		repoPath     = filepath.Join(api.repoRoot, repo)
 	)
 
 	err := api.validateRepoPaths(repoPath, epoch, database, architecture)

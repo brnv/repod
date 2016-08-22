@@ -27,10 +27,7 @@ func listRepositories(repoRoot string) ([]string, error) {
 	return repositories, nil
 }
 
-func listEpoches(
-	repoRoot string,
-	repository Repository,
-) (string, error) {
+func listEpoches(repoRoot string, repository Repository) (string, error) {
 	epoches, err := repository.ListEpoches()
 	if err != nil {
 		return "", hierr.Errorf(
@@ -46,10 +43,7 @@ func listEpoches(
 	return strings.Join(epoches, "\n"), nil
 }
 
-func listPackages(
-	repoRoot string,
-	repository Repository,
-) (string, error) {
+func listPackages(repoRoot string, repository Repository) (string, error) {
 	packages, err := repository.ListPackages()
 	if err != nil {
 		return "", hierr.Errorf(
@@ -106,14 +100,13 @@ func describePackage(
 }
 
 func editPackage(
-	repoRoot string, repository Repository,
-	packageName string, packageFile string,
-	epochToChange string,
+	repoRoot string, repository Repository, packageName string,
+	packageFile string, epochToChange string,
 ) (string, error) {
 	var (
+		filename string
 		file     *os.File
 		err      error
-		filename string
 	)
 
 	if epochToChange != "" {

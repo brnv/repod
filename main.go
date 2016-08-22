@@ -12,7 +12,8 @@ import (
 var (
 	logger  = lorg.NewLog()
 	version = "1"
-	exit    = os.Exit
+
+	exit = os.Exit
 )
 
 var usage = `repod, packages repository manager
@@ -65,6 +66,8 @@ func main() {
 		nucleusAddress, _ = args["--nucleus"].(string)
 		tlsCert, _        = args["--tls-cert"].(string)
 
+		modeListRepos = args["--list"].(bool) && repo == ""
+
 		err        error
 		output     string
 		repository Repository
@@ -74,18 +77,18 @@ func main() {
 		runDaemon(repoRoot, listenAddress, nucleusAddress, tlsCert)
 	}
 
-	if args["--list"].(bool) && repo == "" {
-		repos := []string{}
-		repos, err = listRepositories(repoRoot)
-		output = strings.Join(repos, "\n")
-	} else {
-		repository, err = getRepository(repo, repoRoot, epoch, db, arch)
-		if err != nil {
-			fatalf("%s", err)
-		}
+	repository, err = getRepository(repo, repoRoot, epoch, db, arch)
+	if err != nil && !modeListRepos {
+		fatalf("%s", err)
 	}
 
 	switch {
+	case modeListRepos:
+		repos := []string{}
+		repos, err = listRepositories(repoRoot)
+
+		output = strings.Join(repos, "\n")
+
 	case args["--list"].(bool):
 		if repo != "" {
 			output, err = listEpoches(repoRoot, repository)

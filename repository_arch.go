@@ -23,11 +23,20 @@ type RepositoryArch struct {
 const formatPacmanConfRepo = "[%s]"
 
 func (arch RepositoryArch) ListPackages() ([]string, error) {
-	directory, config, err := arch.preparePacmanSyncDir()
+	directory, err := arch.getSyncDirectory()
 	if err != nil {
 		return []string{}, hierr.Errorf(
 			err,
 			`can't prepare pacman sync directory`,
+		)
+	}
+
+	config, err := arch.getPacmanConfig()
+	if err != nil {
+		os.RemoveAll(directory)
+		return []string{}, hierr.Errorf(
+			err,
+			`can't get pacman temporary config`,
 		)
 	}
 
@@ -72,14 +81,19 @@ func (arch *RepositoryArch) ListEpoches() ([]string, error) {
 	return epoches, nil
 }
 
-func (arch *RepositoryArch) signUpPackage(packageFilename string) error {
+func (arch *RepositoryArch) signUpPackage(
+	packageFilename string,
+) error {
 	cmd := exec.Command(
-		"gpg", "--detach-sign", "--yes", packageFilename,
+		"gpg", "--detach-sign", "--yes",
+		packageFilename,
 	)
+
 	_, _, err := executil.Run(cmd)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -91,6 +105,7 @@ func (arch *RepositoryArch) putPackageIntoRepo(
 		arch.getDatabaseFilepath(),
 		packageFilename,
 	}
+
 	if !force {
 		cmdOptions = append([]string{"-n"}, cmdOptions...)
 	}
@@ -116,7 +131,7 @@ func (arch *RepositoryArch) putPackageIntoRepo(
 	return nil
 }
 
-func (arch *RepositoryArch) PutFileToRepo(
+func (arch *RepositoryArch) CopyFileToRepo(
 	packageFilename string, packageFile io.Reader,
 ) error {
 	dstPackageFile, err := os.Create(
@@ -142,7 +157,16 @@ func (arch *RepositoryArch) AddPackage(
 		return err
 	}
 
-	return arch.putPackageIntoRepo(packageFilename, packageFile, force)
+	err = arch.putPackageIntoRepo(
+		packageFilename,
+		packageFile,
+		force,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (arch RepositoryArch) RemovePackage(packageName string) error {
@@ -154,20 +178,20 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 		return err
 	}
 
-	pattern := filepath.Join(arch.getPackagesPath(), packageName) + "*.tar.xz"
+	searchPattern := filepath.Join(
+		arch.getPackagesPath(), packageName,
+	) + "*.tar.xz"
 
-	files, err := filepath.Glob(pattern)
+	files, err := filepath.Glob(searchPattern)
 	if err != nil {
 		return hierr.Errorf(
 			err,
-			`can't find files by pattern %s`, pattern,
+			`can't find files by searchPattern %s`, searchPattern,
 		)
 	}
 
 	if len(files) == 0 {
-		return fmt.Errorf(
-			"no packages find to remove",
-		)
+		return fmt.Errorf("no packages found to remove")
 	}
 
 	for _, file := range files {
@@ -175,7 +199,7 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 		if err != nil {
 			return hierr.Errorf(
 				err,
-				"can't delete package file from filesystem %s",
+				"can't remove package file %s",
 				file,
 			)
 		}
@@ -187,10 +211,20 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 func (arch RepositoryArch) DescribePackage(
 	packageName string,
 ) (string, error) {
-	directory, config, err := arch.preparePacmanSyncDir()
+	directory, err := arch.getSyncDirectory()
 	if err != nil {
 		return "", err
 	}
+
+	config, err := arch.getPacmanConfig()
+	if err != nil {
+		os.RemoveAll(directory)
+		return "", hierr.Errorf(
+			err,
+			`can't get pacman temporary config`,
+		)
+	}
+
 	defer func() {
 		os.RemoveAll(directory)
 		os.RemoveAll(config)
@@ -202,6 +236,7 @@ func (arch RepositoryArch) DescribePackage(
 		"--dbpath", directory,
 		packageName,
 	)
+
 	pacmanOutput, _, err := executil.Run(cmd)
 	if err != nil {
 		return "", err
@@ -238,25 +273,33 @@ func (arch *RepositoryArch) prepareSyncDirectory(directory string) error {
 
 	err := os.Mkdir(syncDirectoryPath, 0777)
 	if err != nil {
-		return hierr.Errorf(err, "can't create dir %s", syncDirectoryPath)
+		return hierr.Errorf(
+			err,
+			"can't create dir %s", syncDirectoryPath,
+		)
 	}
 
-	targetLink := filepath.Join(syncDirectoryPath, arch.getDatabaseFilename())
+	databaseLinkPath := filepath.Join(
+		syncDirectoryPath,
+		arch.getDatabaseFilename(),
+	)
+
 	err = os.Symlink(
 		arch.getDatabaseFilepath(),
-		targetLink,
+		databaseLinkPath,
 	)
 	if err != nil {
 		return hierr.Errorf(
 			err,
-			"can't symlink %s to %s", arch.getDatabaseFilepath(), targetLink,
+			"can't symlink %s to %s",
+			arch.getDatabaseFilepath(), databaseLinkPath,
 		)
 	}
 
 	return nil
 }
 
-func (arch *RepositoryArch) getTmpPacmanConfig() (string, error) {
+func (arch *RepositoryArch) getPacmanConfig() (string, error) {
 	config, err := ioutil.TempFile("/tmp/", "repod-pacman-config-")
 	if err != nil {
 		return "", err
@@ -275,48 +318,51 @@ func (arch *RepositoryArch) getTmpPacmanConfig() (string, error) {
 	return config.Name(), nil
 }
 
-func (arch *RepositoryArch) preparePacmanSyncDir() (string, string, error) {
+func (arch *RepositoryArch) getSyncDirectory() (string, error) {
 	directory, err := ioutil.TempDir("/tmp/", "repod-")
 	if err != nil {
-		return "", "", hierr.Errorf(err, "can't create temp dir: %s")
+		return "", hierr.Errorf(
+			err,
+			"can't create temp dir: %s",
+		)
 	}
 
 	err = arch.prepareSyncDirectory(directory)
 	if err != nil {
 		os.RemoveAll(directory)
-		return "", "", hierr.Errorf(err, `can't prepare pacman sync directory`)
+		return "", hierr.Errorf(
+			err,
+			`can't prepare pacman sync directory`,
+		)
 	}
 
-	config, err := arch.getTmpPacmanConfig()
-	if err != nil {
-		os.RemoveAll(directory)
-		return "", "", hierr.Errorf(err, `can't get pacman temporary config`)
-	}
-
-	return directory, config, nil
+	return directory, nil
 }
 
 func (arch *RepositoryArch) GetPackageFile(
 	packageName string,
 ) (string, *os.File, error) {
-	pattern := packageName + "*.tar.xz"
+	searchPattern := packageName + "*.tar.xz"
 
-	files, err := filepath.Glob(pattern)
+	files, err := filepath.Glob(searchPattern)
 	if err != nil {
 		return "", nil, hierr.Errorf(
 			err,
-			`can't find files by pattern %s`, pattern,
+			`can't find files by searchPattern %s`, searchPattern,
 		)
 	}
 
 	if len(files) == 0 {
-		return "", nil, fmt.Errorf("no files found by pattern %s", pattern)
+		return "", nil, fmt.Errorf(
+			"no files found by searchPattern %s",
+			searchPattern,
+		)
 	}
 
 	if len(files) > 1 {
 		return "", nil, fmt.Errorf(
-			"more than one file found by pattern %s, %#v",
-			pattern, files,
+			"more than one file found by searchPattern %s, %#v",
+			searchPattern, files,
 		)
 	}
 

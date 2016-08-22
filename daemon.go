@@ -18,11 +18,13 @@ func runDaemon(
 ) {
 	var (
 		nucleusAuth = NucleusAuth{}
-		api         = newAPI(repoRoot)
 		router      = gin.New()
 	)
 
+	api := newAPI(repoRoot)
+
 	if nucleusAddress != "" {
+		api.authNeed = true
 		nucleusAuth.Address = nucleusAddress
 	}
 
