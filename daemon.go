@@ -2,6 +2,14 @@ package main
 
 import "github.com/gin-gonic/gin"
 
+const (
+	urlEpoches       = "/:repo"
+	urlDatabases     = urlEpoches + "/:epoch"
+	urlArchitectures = urlDatabases + "/:db"
+	urlPackages      = urlArchitectures + "/:arch"
+	urlPackage       = urlPackages + "/:package"
+)
+
 func runDaemon(
 	repoRoot string,
 	listenAddress string,
@@ -9,16 +17,20 @@ func runDaemon(
 	tlsCert string,
 ) {
 	var (
-		auth = NucleusAuth{
-			Address: nucleusAddress,
-		}
-		api    = newAPI(repoRoot)
-		router = gin.New()
+		nucleusAuth = NucleusAuth{}
+		api         = newAPI(repoRoot)
+		router      = gin.New()
 	)
 
-	err := auth.AddCertificateFile(tlsCert)
-	if err != nil {
-		fatalf("%s", err)
+	if nucleusAddress != "" {
+		nucleusAuth.Address = nucleusAddress
+	}
+
+	if tlsCert != "" {
+		err := nucleusAuth.AddCertificateFile(tlsCert)
+		if err != nil {
+			fatalf("%s", err)
+		}
 	}
 
 	router.Use(getRouterRecovery(), getRouterLogger())
@@ -30,27 +42,27 @@ func runDaemon(
 			api.handleListRepositories,
 		)
 		v1.Handle(
-			"GET", urlListEpoches,
+			"GET", urlEpoches,
 			api.handleListEpoches,
 		)
 		v1.Handle(
-			"GET", urlListPackages,
+			"GET", urlPackages,
 			api.handleListPackages,
 		)
 		v1.Handle(
-			"POST", urlManipulatePackage,
+			"POST", urlPackages,
 			api.handleAddPackage,
 		)
 		v1.Handle(
-			"GET", urlManipulatePackage,
+			"GET", urlPackage,
 			api.handleDescribePackage,
 		)
 		v1.Handle(
-			"DELETE", urlManipulatePackage,
+			"DELETE", urlPackage,
 			api.handleRemovePackage,
 		)
 		v1.Handle(
-			"PATCH", urlManipulatePackage,
+			"PATCH", urlPackage,
 			api.handleEditPackage,
 		)
 	}

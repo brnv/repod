@@ -111,13 +111,15 @@ api_url="$_repod/v1"
         PKGDEST=$dir PKGNAME=$package \
             makepkg -p $testdir/PKGBUILD --clean --force
 
+        pkgfile="$dir/$package-1-1-$architecture.pkg.tar.xz"
+
         if [[ $run_method == "local" ]]; then
-            :run-local --add $repo $epoch $database $architecture $package \
-                --file=$dir/$package-1-1-$architecture.pkg.tar.xz
+            :run-local --add $repo $epoch $database $architecture \
+                --file="$pkgfile"
         else
             :curl -F \
-                package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz \
-                -XPOST $api_url/$repo/$epoch/$database/$architecture/$package
+                package_file=@$pkgfile -XPOST \
+                $api_url/$repo/$epoch/$database/$architecture
         fi
     done
 }
@@ -144,13 +146,12 @@ api_url="$_repod/v1"
 
         if [[ $run_method == "local" ]]; then
             :run-local \
-                --add unknown_repo $epoch $database $architecture $package \
+                --add unknown_repo $epoch $database $architecture \
                 --file=$dir/$package-1-1-$architecture.pkg.tar.xz
         else
             :curl -F \
                 package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz \
-                -XPOST \
-                $api_url/unknown_repo/$epoch/$database/$architecture/$package
+                -XPOST $api_url/unknown_repo/$epoch/$database/$architecture
         fi
     done
 }
@@ -163,7 +164,7 @@ api_url="$_repod/v1"
     local package="$5"
     local repodir="$(tests:get-tmp-dir)/repositories"
 
-    stat $repodir/$repo/$epoch/$database/$architecture/$package
+    stat $repodir/$repo/$epoch/$database/$architecture/$package*.tar.xz
 }
 
 :remove-package() {

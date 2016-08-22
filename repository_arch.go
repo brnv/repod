@@ -72,11 +72,55 @@ func (arch *RepositoryArch) ListEpoches() ([]string, error) {
 	return epoches, nil
 }
 
-func (arch *RepositoryArch) AddPackage(
-	packageName string, packageFile io.Reader, force bool,
+func (arch *RepositoryArch) signUpPackage(packageFilename string) error {
+	cmd := exec.Command(
+		"gpg", "--detach-sign", "--yes", packageFilename,
+	)
+	_, _, err := executil.Run(cmd)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (arch *RepositoryArch) putPackageIntoRepo(
+	packageFilename string, packageFile io.Reader, force bool,
+) error {
+	cmdOptions := []string{
+		"-s",
+		arch.getDatabaseFilepath(),
+		packageFilename,
+	}
+	if !force {
+		cmdOptions = append([]string{"-n"}, cmdOptions...)
+	}
+
+	_, stderr, err := executil.Run(
+		exec.Command("repo-add", cmdOptions...),
+	)
+	if err != nil {
+		return hierr.Errorf(
+			err,
+			"can't add package to repo, exec args: %#v", cmdOptions,
+		)
+	}
+
+	if !force && string(stderr) != "" {
+		return fmt.Errorf(
+			"repo-add exec error, args: %#v, stderr: %s",
+			cmdOptions,
+			string(stderr),
+		)
+	}
+
+	return nil
+}
+
+func (arch *RepositoryArch) PutFileToRepo(
+	packageFilename string, packageFile io.Reader,
 ) error {
 	dstPackageFile, err := os.Create(
-		filepath.Join(arch.getPackagesPath(), packageName),
+		filepath.Join(arch.getPackagesPath(), packageFilename),
 	)
 	if err != nil {
 		return err
@@ -87,38 +131,18 @@ func (arch *RepositoryArch) AddPackage(
 		return err
 	}
 
-	cmd := exec.Command(
-		"gpg", "--detach-sign", "--yes", dstPackageFile.Name(),
-	)
-	_, _, err = executil.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	cmdOptions := []string{
-		"-s",
-		arch.getDatabaseFilepath(),
-		dstPackageFile.Name(),
-	}
-	if !force {
-		cmdOptions = append([]string{"-n"}, cmdOptions...)
-	}
-
-	_, stderr, err := executil.Run(
-		exec.Command("repo-add", cmdOptions...),
-	)
-	if err != nil {
-		return err
-	}
-
-	if !force && string(stderr) != "" {
-		return hierr.Errorf(
-			fmt.Errorf("can't add package"),
-			`%s`, string(stderr),
-		)
-	}
-
 	return nil
+}
+
+func (arch *RepositoryArch) AddPackage(
+	packageFilename string, packageFile io.Reader, force bool,
+) error {
+	err := arch.signUpPackage(packageFilename)
+	if err != nil {
+		return err
+	}
+
+	return arch.putPackageIntoRepo(packageFilename, packageFile, force)
 }
 
 func (arch RepositoryArch) RemovePackage(packageName string) error {
@@ -130,11 +154,31 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 		return err
 	}
 
-	packageFile := filepath.Join(arch.getPackagesPath(), packageName)
+	pattern := filepath.Join(arch.getPackagesPath(), packageName) + "*.tar.xz"
 
-	err = os.Remove(packageFile)
+	files, err := filepath.Glob(pattern)
 	if err != nil {
-		return err
+		return hierr.Errorf(
+			err,
+			`can't find files by pattern %s`, pattern,
+		)
+	}
+
+	if len(files) == 0 {
+		return fmt.Errorf(
+			"no packages find to remove",
+		)
+	}
+
+	for _, file := range files {
+		err = os.Remove(file)
+		if err != nil {
+			return hierr.Errorf(
+				err,
+				"can't delete package file from filesystem %s",
+				file,
+			)
+		}
 	}
 
 	return nil
@@ -254,23 +298,23 @@ func (arch *RepositoryArch) preparePacmanSyncDir() (string, string, error) {
 
 func (arch *RepositoryArch) GetPackageFile(
 	packageName string,
-) (io.Reader, error) {
-	pattern := filepath.Join(arch.getPackagesPath(), packageName)
+) (string, *os.File, error) {
+	pattern := packageName + "*.tar.xz"
 
 	files, err := filepath.Glob(pattern)
 	if err != nil {
-		return nil, hierr.Errorf(
+		return "", nil, hierr.Errorf(
 			err,
 			`can't find files by pattern %s`, pattern,
 		)
 	}
 
 	if len(files) == 0 {
-		return nil, fmt.Errorf("no files found by pattern %s", pattern)
+		return "", nil, fmt.Errorf("no files found by pattern %s", pattern)
 	}
 
 	if len(files) > 1 {
-		return nil, fmt.Errorf(
+		return "", nil, fmt.Errorf(
 			"more than one file found by pattern %s, %#v",
 			pattern, files,
 		)
@@ -278,10 +322,10 @@ func (arch *RepositoryArch) GetPackageFile(
 
 	file, err := os.Open(files[0])
 	if err != nil {
-		return nil, hierr.Errorf(err, `can't open file %s`, files[0])
+		return "", nil, hierr.Errorf(err, `can't open file %s`, files[0])
 	}
 
-	return file, nil
+	return file.Name(), file, nil
 }
 
 func (arch *RepositoryArch) SetEpoch(epoch string) {

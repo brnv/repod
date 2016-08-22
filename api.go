@@ -133,11 +133,11 @@ func (api *API) handleListPackages(context *gin.Context) {
 
 func (api *API) handleAddPackage(context *gin.Context) {
 	var (
-		err         error
-		response    = newAPIResponse()
-		request     = context.Request
-		packageName = context.Param("package")
-		file        io.Reader
+		err      error
+		response = newAPIResponse()
+		request  = context.Request
+		file     io.Reader
+		filename string
 	)
 
 	repository, err := api.newRepository(context)
@@ -150,7 +150,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 	}
 
 	if repository != nil {
-		file, err = api.getFileFromRequest(request)
+		filename, file, err = api.getFileFromRequest(request)
 		if err != nil {
 			response.Error = hierr.Errorf(
 				err,
@@ -160,11 +160,11 @@ func (api *API) handleAddPackage(context *gin.Context) {
 	}
 
 	if file != nil {
-		err = repository.AddPackage(packageName, file, false)
+		err = repository.AddPackage(filename, file, false)
 		if err != nil {
 			response.Error = hierr.Errorf(
 				err,
-				"can't add package",
+				`can't add given package file %s`, filename,
 			).Error()
 		}
 	}
@@ -204,6 +204,7 @@ func (api *API) handleEditPackage(context *gin.Context) {
 		request     = context.Request
 		packageName = context.Param("package")
 		file        io.Reader
+		filename    string
 	)
 
 	request.ParseForm()
@@ -218,19 +219,25 @@ func (api *API) handleEditPackage(context *gin.Context) {
 	}
 
 	if epochNew != "" {
-		file, err = repository.GetPackageFile(packageName)
+		filename, file, err = repository.GetPackageFile(packageName)
 		repository.SetEpoch(epochNew)
 	} else {
-		file, err = api.getFileFromRequest(context.Request)
+		filename, file, err = api.getFileFromRequest(context.Request)
 	}
 
 	if err != nil {
-		response.Error = err.Error()
-	}
-
-	err = repository.AddPackage(packageName, file, true)
-	if err != nil {
-		response.Error = err.Error()
+		response.Error = hierr.Errorf(
+			err,
+			"can't prepare edit package",
+		).Error()
+	} else {
+		err = repository.AddPackage(filename, file, true)
+		if err != nil {
+			response.Error = hierr.Errorf(
+				err,
+				"can't change package %s", packageName,
+			).Error()
+		}
 	}
 
 	api.sendResponse(context, response)
@@ -355,11 +362,13 @@ func (api *API) validateRepoPaths(
 	return nil
 }
 
-func (api *API) getFileFromRequest(request *http.Request) (io.Reader, error) {
-	file, _, err := request.FormFile("package_file")
+func (api *API) getFileFromRequest(
+	request *http.Request,
+) (string, io.Reader, error) {
+	file, fileinfo, err := request.FormFile("package_file")
 	if err != nil {
-		return nil, hierr.Errorf(err, "can't read form file from request")
+		return "", nil, hierr.Errorf(err, "can't read form file from request")
 	}
 
-	return file, nil
+	return fileinfo.Filename, file, nil
 }

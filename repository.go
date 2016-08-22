@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -10,10 +11,17 @@ import (
 type Repository interface {
 	ListPackages() ([]string, error)
 	ListEpoches() ([]string, error)
+
 	AddPackage(packageName string, file io.Reader, force bool) error
+
 	RemovePackage(packageName string) error
+
 	DescribePackage(packageName string) (string, error)
-	GetPackageFile(packageName string) (io.Reader, error)
+
+	PutFileToRepo(packageName string, file io.Reader) error
+
+	GetPackageFile(packageName string) (string, *os.File, error)
+
 	SetEpoch(epoch string)
 }
 

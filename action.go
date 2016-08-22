@@ -58,16 +58,11 @@ func listPackages(
 		)
 	}
 
-	if len(packages) == 0 {
-		return "", fmt.Errorf("no packages found", nil)
-	}
-
 	return strings.Join(packages, "\n"), nil
 }
 
 func addPackage(
-	repoRoot string, repository Repository,
-	packageName string, packageFile string,
+	repoRoot string, repository Repository, packageFile string,
 ) (string, error) {
 	file, err := os.Open(packageFile)
 	if err != nil {
@@ -77,11 +72,19 @@ func addPackage(
 		)
 	}
 
-	err = repository.AddPackage(packageName, file, false)
+	fileinfo, err := file.Stat()
 	if err != nil {
 		return "", hierr.Errorf(
 			err,
-			`can't add given package`,
+			`can't get stat for file %s`, packageFile,
+		)
+	}
+
+	err = repository.AddPackage(fileinfo.Name(), file, false)
+	if err != nil {
+		return "", hierr.Errorf(
+			err,
+			`can't add package, name %s`, fileinfo.Name(),
 		)
 	}
 
@@ -108,25 +111,26 @@ func editPackage(
 	epochToChange string,
 ) (string, error) {
 	var (
-		file io.Reader
-		err  error
+		file     *os.File
+		err      error
+		filename string
 	)
 
 	if epochToChange != "" {
-		file, err = repository.GetPackageFile(packageName)
+		filename, file, err = repository.GetPackageFile(packageName)
 		if err != nil {
 			return "", err
 		}
-
 		repository.SetEpoch(epochToChange)
 	} else {
 		file, err = os.Open(packageFile)
 		if err != nil {
 			return "", err
 		}
+		filename = file.Name()
 	}
 
-	err = repository.AddPackage(packageName, file, true)
+	err = repository.AddPackage(filename, io.Reader(file), true)
 	if err != nil {
 		return "", err
 	}

@@ -15,23 +15,15 @@ var (
 	exit    = os.Exit
 )
 
-const (
-	urlListEpoches       = "/:repo"
-	urlListDatabases     = urlListEpoches + "/:epoch"
-	urlListArchitectures = urlListDatabases + "/:db"
-	urlListPackages      = urlListArchitectures + "/:arch"
-	urlManipulatePackage = urlListPackages + "/:package"
-)
-
 var usage = `repod, packages repository manager
 
 Usage:
     repod -h | --help
-    repod [options] --listen <address> --nucleus <address> --tls-cert <path>
+    repod [options] --listen <address> [--nucleus <address> --tls-cert <path>]
     repod [options] -L
     repod [options] -L <repo>
-    repod [options] -L <repo> <epoch> <db> <arch>
-    repod [options] (-A|-S|-E|-R) <repo> <epoch> <db> <arch> <package>
+    repod [options] (-L|-A) <repo> <epoch> <db> <arch>
+    repod [options] (-S|-E|-R) <repo> <epoch> <db> <arch> <package>
 
 Options:
     --root <path>             Directory where repositories stored
@@ -39,18 +31,18 @@ Options:
     --listen <address>        Listen specified IP and port.
     --nucleus <address>       Nucleus server address.
     --tls-cert <path>         Path to nucleus ssl certificate file.
-    -L --list                 List packages, epoches or repositories.
-    -A --add                  Add package.
-    -S --show                 Describe package.
     -E --edit                 Edit package file, epoch or description.
+      --change-epoch <epoch>  Specify epoch to copy package to.
+    -A --add                  Add package.
+      --file <path>           Specify file to be upload to repository.
+    -S --show                 Describe package.
+    -L --list                 List packages, epoches or repositories.
     -R --remove               Remove package.
       <repo>                  Target repository name.
       <epoch>                 Target repository epoch.
       <db>                    Target repository database.
       <arch>                  Target repository architecture.
       <package>               Target package to manipulate with.
-      --file <path>           Specify file to be upload to repository.
-      --change-epoch <epoch>  Specify epoch to copy package to.
     -h --help                 Show this help.
 `
 
@@ -105,7 +97,7 @@ func main() {
 
 	case args["--add"].(bool):
 		output, err = addPackage(
-			repoRoot, repository, packageName, packageFile,
+			repoRoot, repository, packageFile,
 		)
 
 	case args["--show"].(bool):

@@ -29,5 +29,5 @@ actual=$(:list-packages curl arch-repo testing testing-db x86_64)
 
 tests:assert-equals "$actual" "$expected"
 
-tests:not tests:ensure :stat-package \
-    arch-repo testing testing-db x86_64 package_one
+tests:not tests:ensure \
+    :stat-package arch-repo testing testing-db x86_64 package_one

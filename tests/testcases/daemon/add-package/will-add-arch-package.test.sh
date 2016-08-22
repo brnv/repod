@@ -19,7 +19,7 @@ Status = 200
 
 [Data]'
 
-actual=$(:add-package curl arch-repo testing testing-db x86_64 package_one)
+:add-package curl arch-repo testing testing-db x86_64 package_one
 
 expected='Success = true
 Error = ""
