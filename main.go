@@ -48,6 +48,8 @@ Options:
 func main() {
 	args := godocs.MustParse(usage, version, godocs.UsePager)
 
+	logger.SetIndentLines(true)
+
 	var (
 		root    = args["--root"].(string)
 		path, _ = args["<path>"].(string)
@@ -76,7 +78,7 @@ func main() {
 
 	repository, err = getRepository(root, path, system)
 	if err != nil && !modeListRepositories {
-		fatalf("%s", err)
+		fatalln(err)
 	}
 
 	switch {
