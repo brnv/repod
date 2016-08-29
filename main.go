@@ -22,7 +22,7 @@ Usage:
   repod -h | --help
   repod [options] --listen <address> [--nucleus <address> --tls-cert <path>]
   repod [options] -L [<path>]
-  repod [options] -A <path> [-f <path>]
+  repod [options] -A <path> -f <path>
   repod [options] (-E|-S|-R) <path> <package> [-f <path>]
 
 Options:
@@ -38,7 +38,7 @@ Options:
   -R --remove          Remove package.
   -A --add             Add package.
     -f --file <path>   Specify file to be upload to repository.
-  -L --list            List packages, epoches or repositories.
+  -L --list            List packages and repositories.
     <path>             Target repository path.
     <package>          Target package to manipulate with.
   -s --system <type>   Specify repository system [default: autodetect]
