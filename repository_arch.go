@@ -133,6 +133,14 @@ func (arch *RepositoryArch) CopyFileToRepo(
 	packageName string, packageFile io.Reader,
 ) (string, error) {
 	dstPackagePath := filepath.Join(arch.getPackagesPath(), packageName)
+
+	err := os.MkdirAll(filepath.Dir(dstPackagePath), 0644)
+	if err != nil {
+		return "", hierr.Errorf(
+			err, "can't create directory %s", filepath.Dir(dstPackagePath),
+		)
+	}
+
 	dstPackageFile, err := os.Create(dstPackagePath)
 	if err != nil {
 		return "", hierr.Errorf(
