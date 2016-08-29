@@ -1,21 +1,20 @@
 package main
 
 import (
-	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/kovetskiy/hierr"
 )
 
-func listRepositories(repoRoot string) ([]string, error) {
-	repositoriesFileInfo, err := ioutil.ReadDir(repoRoot)
+func listRepositories(root string) ([]string, error) {
+	repositoriesFileInfo, err := ioutil.ReadDir(root)
 	if err != nil {
 		return []string{}, hierr.Errorf(
 			err,
-			`can't list repositories from root %s`, repoRoot,
+			`can't list repositories from root %s`, root,
 		)
 	}
 
@@ -27,23 +26,7 @@ func listRepositories(repoRoot string) ([]string, error) {
 	return repositories, nil
 }
 
-func listEpoches(repoRoot string, repository Repository) (string, error) {
-	epoches, err := repository.ListEpoches()
-	if err != nil {
-		return "", hierr.Errorf(
-			err,
-			`can't list epoches for repository`,
-		)
-	}
-
-	if len(epoches) == 0 {
-		return "", fmt.Errorf("no epoches found", nil)
-	}
-
-	return strings.Join(epoches, "\n"), nil
-}
-
-func listPackages(repoRoot string, repository Repository) (string, error) {
+func listPackages(repository Repository) (string, error) {
 	packages, err := repository.ListPackages()
 	if err != nil {
 		return "", hierr.Errorf(
@@ -56,29 +39,30 @@ func listPackages(repoRoot string, repository Repository) (string, error) {
 }
 
 func addPackage(
-	repoRoot string, repository Repository, packageFile string,
+	repository Repository,
+	packagePath string,
 ) (string, error) {
-	file, err := os.Open(packageFile)
+	file, err := os.Open(packagePath)
 	if err != nil {
 		return "", hierr.Errorf(
 			err,
-			`can't open given file %s`, packageFile,
+			`can't open given file %s`, packagePath,
 		)
 	}
 
-	fileinfo, err := file.Stat()
+	_, err = repository.CopyFileToRepo(path.Base(file.Name()), file)
 	if err != nil {
 		return "", hierr.Errorf(
 			err,
-			`can't get stat for file %s`, packageFile,
+			"can't copy file to repository dir",
 		)
 	}
 
-	err = repository.AddPackage(fileinfo.Name(), file, false)
+	err = repository.AddPackage(path.Base(packagePath), file, false)
 	if err != nil {
 		return "", hierr.Errorf(
 			err,
-			`can't add package, name %s`, fileinfo.Name(),
+			`can't add package from file %s`, packagePath,
 		)
 	}
 
@@ -86,7 +70,7 @@ func addPackage(
 }
 
 func describePackage(
-	repoRoot string, repository Repository, packageName string,
+	repository Repository, packageName string,
 ) (string, error) {
 	description, err := repository.DescribePackage(packageName)
 	if err != nil {
@@ -100,8 +84,8 @@ func describePackage(
 }
 
 func editPackage(
-	repoRoot string, repository Repository, packageName string,
-	packageFile string, epochToChange string,
+	repository Repository, packageName string,
+	packageFile string, rootNew string,
 ) (string, error) {
 	var (
 		filename string
@@ -109,12 +93,15 @@ func editPackage(
 		err      error
 	)
 
-	if epochToChange != "" {
+	if rootNew != "" {
 		filename, file, err = repository.GetPackageFile(packageName)
 		if err != nil {
-			return "", err
+			return "", hierr.Errorf(
+				err,
+				"can't get package file %s", packageName,
+			)
 		}
-		repository.SetEpoch(epochToChange)
+		repository.SetPath(rootNew)
 	} else {
 		file, err = os.Open(packageFile)
 		if err != nil {
@@ -123,7 +110,7 @@ func editPackage(
 		filename = file.Name()
 	}
 
-	err = repository.AddPackage(filename, io.Reader(file), true)
+	err = repository.AddPackage(filename, file, true)
 	if err != nil {
 		return "", err
 	}

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -12,17 +11,14 @@ type Repository interface {
 	ListPackages() ([]string, error)
 	ListEpoches() ([]string, error)
 
-	AddPackage(packageName string, file io.Reader, force bool) error
+	AddPackage(packageName string, file *os.File, force bool) error
+	CopyFileToRepo(packageName string, file io.Reader) (string, error)
 
 	RemovePackage(packageName string) error
-
 	DescribePackage(packageName string) (string, error)
-
-	CopyFileToRepo(packageName string, file io.Reader) error
-
 	GetPackageFile(packageName string) (string, *os.File, error)
 
-	SetEpoch(epoch string)
+	SetPath(path string)
 }
 
 const (
@@ -43,25 +39,14 @@ func detectRepositoryOS(repository string) string {
 	return osUnknown
 }
 
-func getRepository(
-	repo string,
-	repoRoot string,
-	epoch string,
-	database string,
-	architecture string,
-) (Repository, error) {
-	var (
-		osType   = detectRepositoryOS(repo)
-		repoPath = filepath.Join(repoRoot, repo)
-	)
+func getRepository(root string, path string) (Repository, error) {
+	osType := detectRepositoryOS(path)
 
 	switch osType {
 	case osArchLinux:
 		return &RepositoryArch{
-			path:         repoPath,
-			epoch:        epoch,
-			database:     database,
-			architecture: architecture,
+			root: root,
+			path: path,
 		}, nil
 
 	default:

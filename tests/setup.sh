@@ -49,9 +49,11 @@ api_url="$_repod/v1"
     local architecture="${4:-}"
 
     local testdir=$(tests:get-tmp-dir)
-    local dir=$testdir/repositories/$repo/$epoch/$database/$architecture
+    local dir=$testdir/repositories/$repo/$epoch/$database/x86_64
+    local packages=$testdir/packages/$repo/$epoch/$database/x86_64
 
     mkdir -p $dir
+    mkdir -p $packages
 }
 
 :list-repositories() {
@@ -79,31 +81,25 @@ api_url="$_repod/v1"
 
 :list-packages() {
     local run_method="$1"
-    local repo="$2"
-    local epoch="$3"
-    local database="$4"
-    local architecture="$5"
-    shift 5
+    local path="$2"
+    shift 2
 
     if [[ $run_method == "local" ]]; then
-        :run-local --list $repo $epoch $database $architecture
+        :run-local --list $path
     else
-        :curl $api_url/$repo/$epoch/$database/$architecture
+        :curl $api_url/$path
     fi
 }
 
 :add-package() {
     local run_method="$1"
-    local repo="$2"
-    local epoch="$3"
-    local database="$4"
-    local architecture="$5"
-    shift 5
+    local path="$2"
+    shift 2
 
     local packages=${@}
 
     local testdir=$(tests:get-tmp-dir)
-    local dir=$testdir/repositories/$repo/$epoch/$database/$architecture
+    local dir=$testdir/packages/$path
 
     for package in $packages; do
         tests:ensure cp $testdir/PKGBUILD $dir/
@@ -111,15 +107,14 @@ api_url="$_repod/v1"
         PKGDEST=$dir PKGNAME=$package \
             makepkg -p $testdir/PKGBUILD --clean --force
 
-        pkgfile="$dir/$package-1-1-$architecture.pkg.tar.xz"
+        pkgfile="$dir/$package-1-1-x86_64.pkg.tar.xz"
 
         if [[ $run_method == "local" ]]; then
-            :run-local --add $repo $epoch $database $architecture \
-                --file="$pkgfile"
+            :run-local --add $path --file="$pkgfile"
         else
             :curl -F \
                 package_file=@$pkgfile -XPOST \
-                $api_url/$repo/$epoch/$database/$architecture
+                $api_url/$path
         fi
     done
 }
@@ -127,16 +122,13 @@ api_url="$_repod/v1"
 # TODO fix this
 :add-package-fail() {
     local run_method="$1"
-    local repo="$2"
-    local epoch="$3"
-    local database="$4"
-    local architecture="$5"
-    shift 5
+    local path="$2"
+    shift 2
 
     local packages=${@}
 
     local testdir=$(tests:get-tmp-dir)
-    local dir=$testdir/repositories/$repo/$epoch/$database/$architecture
+    local dir=$testdir/repositories/$path
 
     for package in $packages; do
         cp $testdir/PKGBUILD $dir/
@@ -146,71 +138,61 @@ api_url="$_repod/v1"
 
         if [[ $run_method == "local" ]]; then
             :run-local \
-                --add unknown_repo $epoch $database $architecture \
-                --file=$dir/$package-1-1-$architecture.pkg.tar.xz
+                --add unknown_repo $epoch $database x86_64 \
+                --file=$dir/$package-1-1-x86_64.pkg.tar.xz
         else
             :curl -F \
-                package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz \
-                -XPOST $api_url/unknown_repo/$epoch/$database/$architecture
+                package_file=@$dir/$package-1-1-x86_64.pkg.tar.xz \
+                -XPOST $api_url/unknown_repo/$epoch/$database/x86_64
         fi
     done
 }
 
 :stat-package() {
-    local repo="$1"
-    local epoch="$2"
-    local database="$3"
-    local architecture="$4"
-    local package="$5"
+    local path="$1"
+    local package="$2"
+    shift 2
+
     local repodir="$(tests:get-tmp-dir)/repositories"
 
-    stat $repodir/$repo/$epoch/$database/$architecture/$package*.tar.xz
+    stat $repodir/$path/$package*.tar.xz
 }
 
 :remove-package() {
     local run_method="$1"
-    local repo="$2"
-    local epoch="$3"
-    local database="$4"
-    local architecture="$5"
-    local package="$6"
-    shift 6
+    local path="$2"
+    local package="$3"
+    shift 3
 
     if [[ $run_method == "local" ]]; then
-        :run-local --remove $repo $epoch $database $architecture $package
+        :run-local --remove $path $package
     else
-        :curl -XDELETE $api_url/$repo/$epoch/$database/$architecture/$package
+        :curl -XDELETE $api_url/$path/$package
     fi
 }
 
 :describe-package() {
     local run_method="$1"
-    local repo="$2"
-    local epoch="$3"
-    local database="$4"
-    local architecture="$5"
-    local package="$6"
-    shift 6
+    local path="$2"
+    local package="$3"
+    shift 3
 
     if [[ $run_method == "local" ]]; then
-        :run-local --show $repo $epoch $database $architecture $package
+        :run-local --show $path $package
     else
-        :curl $api_url/$repo/$epoch/$database/$architecture/$package
+        :curl $api_url/$path/$package
     fi
 }
 
 :edit-package-description() {
     local run_method="$1"
-    local repo="$2"
-    local epoch="$3"
-    local database="$4"
-    local architecture="$5"
-    local package="$6"
-    local description="$7"
-    shift 7
+    local path="$2"
+    local package="$3"
+    local description="$4"
+    shift 4
 
     local testdir=$(tests:get-tmp-dir)
-    local dir=$testdir/repositories/$repo/$epoch/$database/$architecture
+    local dir=$testdir/repositories/$path
 
     cp $testdir/PKGBUILD $dir/
 
@@ -218,30 +200,27 @@ api_url="$_repod/v1"
         makepkg -p $testdir/PKGBUILD --clean --force
 
     if [[ $run_method == "local" ]]; then
-        :run-local --edit $repo $epoch $database $architecture $package \
-            --file $dir/$package-1-1-$architecture.pkg.tar.xz
+        :run-local --edit $path $package \
+            --file $dir/$package-1-1-x86_64.pkg.tar.xz
     else
         :curl -F \
-            package_file=@$dir/$package-1-1-$architecture.pkg.tar.xz -XPATCH \
-            $api_url/$repo/$epoch/$database/$architecture/$package
+            package_file=@$dir/$package-1-1-x86_64.pkg.tar.xz -XPATCH \
+            $api_url/$path/$package
     fi
 }
 
-:copy-package-to-epoch() {
+:copy-package-to-new-root() {
     local run_method="$1"
-    local repo="$2"
-    local epoch="$3"
-    local database="$4"
-    local architecture="$5"
-    local package="$6"
-    local new_epoch="$7"
-    shift 7
+    local path="$2"
+    local package="$3"
+    local new_root="$4"
+    shift 4
 
     if [[ $run_method == "local" ]]; then
-        :run-local --edit $repo $epoch $database $architecture $package \
-            --change-epoch $new_epoch
+        :run-local --edit $path $package \
+            --copy-to $new_root
     else
-        :curl -d "epoch_new=$new_epoch" -XPATCH \
-            $api_url/$repo/$epoch/$database/$architecture/$package
+        :curl -d "copy-to=$new_root" -XPATCH \
+            $api_url/$path/$package
     fi
 }

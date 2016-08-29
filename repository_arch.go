@@ -14,10 +14,8 @@ import (
 )
 
 type RepositoryArch struct {
-	path         string
-	epoch        string
-	database     string
-	architecture string
+	root string
+	path string
 }
 
 const formatPacmanConfRepo = "[%s]"
@@ -82,11 +80,11 @@ func (arch *RepositoryArch) ListEpoches() ([]string, error) {
 }
 
 func (arch *RepositoryArch) signUpPackage(
-	packageFilename string,
+	packageName string,
 ) error {
 	cmd := exec.Command(
 		"gpg", "--detach-sign", "--yes",
-		packageFilename,
+		packageName,
 	)
 
 	_, _, err := executil.Run(cmd)
@@ -97,13 +95,13 @@ func (arch *RepositoryArch) signUpPackage(
 	return nil
 }
 
-func (arch *RepositoryArch) putPackageIntoRepo(
-	packageFilename string, packageFile io.Reader, force bool,
+func (arch *RepositoryArch) updateRepo(
+	packageName string, packageFile io.Reader, force bool,
 ) error {
 	cmdOptions := []string{
 		"-s",
 		arch.getDatabaseFilepath(),
-		packageFilename,
+		packageName,
 	}
 
 	if !force {
@@ -132,36 +130,37 @@ func (arch *RepositoryArch) putPackageIntoRepo(
 }
 
 func (arch *RepositoryArch) CopyFileToRepo(
-	packageFilename string, packageFile io.Reader,
-) error {
-	dstPackageFile, err := os.Create(
-		filepath.Join(arch.getPackagesPath(), packageFilename),
-	)
+	packageName string, packageFile io.Reader,
+) (string, error) {
+	dstPackagePath := filepath.Join(arch.getPackagesPath(), packageName)
+	dstPackageFile, err := os.Create(dstPackagePath)
 	if err != nil {
-		return err
+		return "", hierr.Errorf(
+			err,
+			"can't create package file %s", packageName,
+		)
 	}
 
 	_, err = io.Copy(dstPackageFile, packageFile)
 	if err != nil {
-		return err
+		return "", hierr.Errorf(
+			err,
+			"can't copy file content to destination",
+		)
 	}
 
-	return nil
+	return dstPackageFile.Name(), nil
 }
 
 func (arch *RepositoryArch) AddPackage(
-	packageFilename string, packageFile io.Reader, force bool,
+	packageName string, packageFile *os.File, force bool,
 ) error {
-	err := arch.signUpPackage(packageFilename)
+	err := arch.signUpPackage(packageFile.Name())
 	if err != nil {
 		return err
 	}
 
-	err = arch.putPackageIntoRepo(
-		packageFilename,
-		packageFile,
-		force,
-	)
+	err = arch.updateRepo(packageName, packageFile, force)
 	if err != nil {
 		return err
 	}
@@ -246,7 +245,7 @@ func (arch RepositoryArch) DescribePackage(
 }
 
 func (arch *RepositoryArch) getDatabaseName() string {
-	return arch.database + "-" + arch.epoch
+	return strings.Replace(arch.path, "/", "-", -1)
 }
 
 func (arch *RepositoryArch) getDatabaseFilename() string {
@@ -260,12 +259,7 @@ func (arch *RepositoryArch) getDatabaseFilepath() string {
 }
 
 func (arch RepositoryArch) getPackagesPath() string {
-	return filepath.Join(
-		arch.path,
-		arch.epoch,
-		arch.database,
-		arch.architecture,
-	)
+	return filepath.Join(arch.root, arch.path)
 }
 
 func (arch *RepositoryArch) prepareSyncDirectory(directory string) error {
@@ -374,6 +368,6 @@ func (arch *RepositoryArch) GetPackageFile(
 	return file.Name(), file, nil
 }
 
-func (arch *RepositoryArch) SetEpoch(epoch string) {
-	arch.epoch = epoch
+func (arch *RepositoryArch) SetPath(path string) {
+	arch.path = path
 }

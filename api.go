@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
@@ -16,7 +16,7 @@ import (
 )
 
 type API struct {
-	repoRoot string
+	root     string
 	authNeed bool
 }
 
@@ -27,9 +27,9 @@ type APIResponse struct {
 	Status  int
 }
 
-func newAPI(repoRoot string) *API {
+func newAPI(root string) *API {
 	return &API{
-		repoRoot: repoRoot,
+		root: root,
 	}
 }
 
@@ -44,11 +44,11 @@ func newAPIResponse() APIResponse {
 func (api *API) handleListRepositories(context *gin.Context) {
 	response := newAPIResponse()
 
-	repositories, err := listRepositories(api.repoRoot)
+	repositories, err := listRepositories(api.root)
 	if err != nil {
 		response.Status = http.StatusInternalServerError
 		response.Error = hierr.Errorf(
-			err, "can't read repo dir %s", api.repoRoot,
+			err, "can't read repo dir %s", api.root,
 		).Error()
 	}
 
@@ -129,7 +129,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 	var (
 		request  = context.Request
 		response = newAPIResponse()
-		file     io.Reader
+		file     *os.File
 		filename string
 		err      error
 	)
@@ -144,7 +144,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 	}
 
 	if repository != nil {
-		filename, file, err = api.getFileFromRequest(request)
+		filename, file, err = api.copyFileFromRequest(repository, request)
 		if err != nil {
 			response.Error = hierr.Errorf(
 				err,
@@ -196,13 +196,13 @@ func (api *API) handleEditPackage(context *gin.Context) {
 		request     = context.Request
 		packageName = context.Param("package")
 		response    = newAPIResponse()
-		file        io.Reader
+		file        *os.File
 		filename    string
 		err         error
 	)
 
 	request.ParseForm()
-	epochNew := request.Form.Get("epoch_new")
+	pathNew := request.Form.Get("epoch_new")
 
 	repository, err := api.newRepository(context)
 	if err != nil {
@@ -212,11 +212,14 @@ func (api *API) handleEditPackage(context *gin.Context) {
 		).Error()
 	}
 
-	if epochNew != "" {
+	if pathNew != "" {
 		filename, file, err = repository.GetPackageFile(packageName)
-		repository.SetEpoch(epochNew)
+		repository.SetPath(pathNew)
 	} else {
-		filename, file, err = api.getFileFromRequest(context.Request)
+		filename, file, err = api.copyFileFromRequest(
+			repository,
+			context.Request,
+		)
 	}
 
 	if err != nil {
@@ -314,7 +317,7 @@ func (api *API) newRepository(context *gin.Context) (Repository, error) {
 		epoch        = context.Param("epoch")
 		database     = context.Param("db")
 		architecture = context.Param("arch")
-		repoPath     = filepath.Join(api.repoRoot, repo)
+		repoPath     = filepath.Join(api.root, repo)
 	)
 
 	err := api.validateRepoPaths(repoPath, epoch, database, architecture)
@@ -326,7 +329,15 @@ func (api *API) newRepository(context *gin.Context) (Repository, error) {
 		)
 	}
 
-	return getRepository(repo, api.repoRoot, epoch, database, architecture)
+	return getRepository(
+		api.root,
+		filepath.Join(
+			repo,
+			epoch,
+			database,
+			architecture,
+		),
+	)
 }
 
 func (api *API) validateRepoPaths(
@@ -360,13 +371,33 @@ func (api *API) validateRepoPaths(
 	return nil
 }
 
-func (api *API) getFileFromRequest(
+func (api *API) copyFileFromRequest(
+	repository Repository,
 	request *http.Request,
-) (string, io.Reader, error) {
-	file, fileinfo, err := request.FormFile("package_file")
+) (string, *os.File, error) {
+	formFile, fileinfo, err := request.FormFile("package_file")
 	if err != nil {
 		return "", nil, hierr.Errorf(err, "can't read form file from request")
 	}
 
-	return fileinfo.Filename, file, nil
+	filePath, err := repository.CopyFileToRepo(
+		path.Base(fileinfo.Filename),
+		formFile,
+	)
+	if err != nil {
+		return "", nil, hierr.Errorf(
+			err,
+			"can't copy file to repo",
+		)
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", nil, hierr.Errorf(
+			err,
+			"can't open file path %s", filePath,
+		)
+	}
+
+	return filePath, file, nil
 }

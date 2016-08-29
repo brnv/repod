@@ -21,10 +21,9 @@ var usage = `repod, packages repository manager
 Usage:
     repod -h | --help
     repod [options] --listen <address> [--nucleus <address> --tls-cert <path>]
-    repod [options] -L
-    repod [options] -L <repo>
-    repod [options] (-L|-A) <repo> <epoch> <db> <arch>
-    repod [options] (-S|-E|-R) <repo> <epoch> <db> <arch> <package>
+    repod [options] -L [<path>]
+    repod [options] -A <path>
+    repod [options] (-E|-S|-R) <path> <package>
 
 Options:
     --root <path>             Directory where repositories stored
@@ -32,18 +31,17 @@ Options:
     --listen <address>        Listen specified IP and port.
     --nucleus <address>       Nucleus server address.
     --tls-cert <path>         Path to nucleus ssl certificate file.
-    -E --edit                 Edit package file, epoch or description.
-      --change-epoch <epoch>  Specify epoch to copy package to.
+
+    -E --edit                 Edit package file, database or description.
+      --copy-to <path>        Specify database to copy package to.
+    -S --show                 Describe package.
+    -R --remove               Remove package.
     -A --add                  Add package.
       --file <path>           Specify file to be upload to repository.
-    -S --show                 Describe package.
     -L --list                 List packages, epoches or repositories.
-    -R --remove               Remove package.
-      <repo>                  Target repository name.
-      <epoch>                 Target repository epoch.
-      <db>                    Target repository database.
-      <arch>                  Target repository architecture.
+      <path>                  Target repository path.
       <package>               Target package to manipulate with.
+
     -h --help                 Show this help.
 `
 
@@ -51,22 +49,19 @@ func main() {
 	args := godocs.MustParse(usage, version, godocs.UsePager)
 
 	var (
-		repoRoot = args["--root"].(string)
+		root    = args["--root"].(string)
+		path, _ = args["<path>"].(string)
 
-		repo, _        = args["<repo>"].(string)
-		epoch, _       = args["<epoch>"].(string)
-		db, _          = args["<db>"].(string)
-		arch, _        = args["<arch>"].(string)
 		packageName, _ = args["<package>"].(string)
-		packageFile, _ = args["--file"].(string)
+		packagePath, _ = args["--file"].(string)
 
-		epochToChange, _ = args["--change-epoch"].(string)
+		rootNew, _ = args["--copy-to"].(string)
 
 		listenAddress, _  = args["--listen"].(string)
 		nucleusAddress, _ = args["--nucleus"].(string)
 		tlsCert, _        = args["--tls-cert"].(string)
 
-		modeListRepos = args["--list"].(bool) && repo == ""
+		modeListRepositories = args["--list"].(bool) && path == ""
 
 		err        error
 		output     string
@@ -74,44 +69,37 @@ func main() {
 	)
 
 	if listenAddress != "" {
-		runDaemon(repoRoot, listenAddress, nucleusAddress, tlsCert)
+		runDaemon(root, listenAddress, nucleusAddress, tlsCert)
 	}
 
-	repository, err = getRepository(repo, repoRoot, epoch, db, arch)
-	if err != nil && !modeListRepos {
+	repository, err = getRepository(root, path)
+	if err != nil && !modeListRepositories {
 		fatalf("%s", err)
 	}
 
 	switch {
-	case modeListRepos:
+	case modeListRepositories:
 		repos := []string{}
-		repos, err = listRepositories(repoRoot)
+		repos, err = listRepositories(root)
 
 		output = strings.Join(repos, "\n")
 
 	case args["--list"].(bool):
-		if repo != "" {
-			output, err = listEpoches(repoRoot, repository)
-		}
-
-		if repo != "" && arch != "" {
-			output, err = listPackages(repoRoot, repository)
+		if path != "" {
+			output, err = listPackages(repository)
 		}
 
 	case args["--add"].(bool):
-		output, err = addPackage(
-			repoRoot, repository, packageFile,
-		)
+		output, err = addPackage(repository, packagePath)
 
 	case args["--show"].(bool):
 		output, err = describePackage(
-			repoRoot, repository, packageName,
+			repository, packageName,
 		)
 
 	case args["--edit"].(bool):
 		output, err = editPackage(
-			repoRoot, repository, packageName,
-			packageFile, epochToChange,
+			repository, packageName, packagePath, rootNew,
 		)
 
 	case args["--remove"].(bool):
@@ -123,5 +111,7 @@ func main() {
 		fatalf("%s", err)
 	}
 
-	fmt.Print(output)
+	if len(output) > 0 {
+		fmt.Println(output)
+	}
 }
