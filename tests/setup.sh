@@ -71,7 +71,7 @@ api_url="$_repod/v1"
     local run_method="$1"
     local path="$2"
     local system="${3:-archlinux}"
-    shift 3
+    shift 2
 
     if [[ $run_method == "local" ]]; then
         :run-local --list $path
@@ -193,7 +193,6 @@ api_url="$_repod/v1"
         :curl -F \
             package_file=@$dir/$package-1-1-x86_64.pkg.tar.xz -XPATCH \
             $api_url/package/$package?path=$path\&system=archlinux
-
     fi
 }
 

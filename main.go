@@ -23,7 +23,7 @@ Usage:
   repod [options] --listen <address> [--nucleus <address> --tls-cert <path>]
   repod [options] -L [<path>]
   repod [options] -A <path> [-f <path>]
-  repod [options] (-E|-S|-R) <path> <package>
+  repod [options] (-E|-S|-R) <path> <package> [-f <path>]
 
 Options:
   --root <path>        Directory where repositories stored
