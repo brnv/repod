@@ -3,12 +3,9 @@ package main
 import "github.com/gin-gonic/gin"
 
 const (
-	urlSystems       = "/:system"
-	urlEpoches       = urlSystems + "/:repo"
-	urlDatabases     = urlEpoches + "/:epoch"
-	urlArchitectures = urlDatabases + "/:db"
-	urlPackages      = urlArchitectures + "/:arch"
-	urlPackage       = urlPackages + "/:package"
+	urlList    = "/list"
+	urlAdd     = "/add"
+	urlPackage = "/package/:name"
 )
 
 func runDaemon(
@@ -45,15 +42,11 @@ func runDaemon(
 			api.handleListRepositories,
 		)
 		v1.Handle(
-			"GET", urlEpoches,
-			api.handleListEpoches,
-		)
-		v1.Handle(
-			"GET", urlPackages,
+			"GET", urlList,
 			api.handleListPackages,
 		)
 		v1.Handle(
-			"POST", urlPackages,
+			"POST", urlAdd,
 			api.handleAddPackage,
 		)
 		v1.Handle(

@@ -63,7 +63,8 @@ func main() {
 		nucleusAddress, _ = args["--nucleus"].(string)
 		tlsCert, _        = args["--tls-cert"].(string)
 
-		modeListRepositories = args["--list"].(bool) && path == ""
+		modeList, _          = args["--list"].(bool)
+		modeListRepositories = modeList && path == ""
 
 		err        error
 		output     string

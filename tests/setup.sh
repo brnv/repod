@@ -67,27 +67,16 @@ api_url="$_repod/v1"
     fi
 }
 
-:list-epoches() {
-    local run_method="$1"
-    local repo="$2"
-    shift 2
-
-    if [[ $run_method == "local" ]]; then
-        :run-local --list $repo
-    else
-        :curl $api_url/$repo
-    fi
-}
-
 :list-packages() {
     local run_method="$1"
     local path="$2"
-    shift 2
+    local system="${3:-archlinux}"
+    shift 3
 
     if [[ $run_method == "local" ]]; then
         :run-local --list $path
     else
-        :curl $api_url/$path
+        :curl $api_url/list?path=$path\&system=$system
     fi
 }
 
@@ -112,9 +101,8 @@ api_url="$_repod/v1"
         if [[ $run_method == "local" ]]; then
             :run-local --add $path --file="$pkgfile"
         else
-            :curl -F \
-                package_file=@$pkgfile -XPOST \
-                $api_url/$path
+            :curl -F package_file=@$pkgfile -XPOST \
+                $api_url/add?path=$path\&system=archlinux
         fi
     done
 }
@@ -128,22 +116,21 @@ api_url="$_repod/v1"
     local packages=${@}
 
     local testdir=$(tests:get-tmp-dir)
-    local dir=$testdir/repositories/$path
+    local dir=$testdir/packages/$path
 
     for package in $packages; do
-        cp $testdir/PKGBUILD $dir/
+        tests:ensure cp $testdir/PKGBUILD $dir/
 
         PKGDEST=$dir PKGNAME=$package \
             makepkg -p $testdir/PKGBUILD --clean --force
 
         if [[ $run_method == "local" ]]; then
-            :run-local \
-                --add unknown_repo $epoch $database x86_64 \
+            :run-local --add unknown_repo \
                 --file=$dir/$package-1-1-x86_64.pkg.tar.xz
         else
             :curl -F \
                 package_file=@$dir/$package-1-1-x86_64.pkg.tar.xz \
-                -XPOST $api_url/unknown_repo/$epoch/$database/x86_64
+                -XPOST $api_url/add?path=unknown_repo
         fi
     done
 }
@@ -167,7 +154,7 @@ api_url="$_repod/v1"
     if [[ $run_method == "local" ]]; then
         :run-local --remove $path $package
     else
-        :curl -XDELETE $api_url/$path/$package
+        :curl -XDELETE $api_url/package/$package?path=$path\&system=archlinux
     fi
 }
 
@@ -180,7 +167,7 @@ api_url="$_repod/v1"
     if [[ $run_method == "local" ]]; then
         :run-local --show $path $package
     else
-        :curl $api_url/$path/$package
+        :curl $api_url/package/$package?path=$path\&system=archlinux
     fi
 }
 
@@ -205,7 +192,8 @@ api_url="$_repod/v1"
     else
         :curl -F \
             package_file=@$dir/$package-1-1-x86_64.pkg.tar.xz -XPATCH \
-            $api_url/$path/$package
+            $api_url/package/$package?path=$path\&system=archlinux
+
     fi
 }
 
@@ -221,6 +209,7 @@ api_url="$_repod/v1"
             --copy-to $new_root
     else
         :curl -d "copy-to=$new_root" -XPATCH \
-            $api_url/$path/$package
+            $api_url/package/$package?path=$path\&system=archlinux
+
     fi
 }

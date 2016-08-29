@@ -1,12 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kovetskiy/toml"
@@ -57,42 +55,6 @@ func (api *API) handleListRepositories(context *gin.Context) {
 	api.sendResponse(context, response)
 }
 
-func (api *API) handleListEpoches(context *gin.Context) {
-	var (
-		response = newAPIResponse()
-		epoches  []string
-	)
-
-	repository, err := api.newRepository(context)
-	if err != nil {
-		response.Status = http.StatusBadRequest
-		response.Error = hierr.Errorf(
-			err,
-			"can't start work with repo",
-		).Error()
-	}
-
-	if repository != nil {
-		epoches, err = repository.ListEpoches()
-		if err != nil {
-			response.Status = http.StatusInternalServerError
-			response.Error = hierr.Errorf(
-				err,
-				"can't list epoches for repo",
-			).Error()
-		}
-	}
-
-	if len(epoches) == 0 && response.Error == "" {
-		response.Status = http.StatusBadRequest
-		response.Error = fmt.Errorf("no epoches found for repo").Error()
-	}
-
-	response.Data = epoches
-
-	api.sendResponse(context, response)
-}
-
 func (api *API) handleListPackages(context *gin.Context) {
 	var (
 		response = newAPIResponse()
@@ -100,7 +62,11 @@ func (api *API) handleListPackages(context *gin.Context) {
 		err      error
 	)
 
-	repository, err := api.newRepository(context)
+	repository, err := getRepository(
+		api.root,
+		context.Query("path"),
+		context.Query("system"),
+	)
 	if err != nil {
 		response.Status = http.StatusBadRequest
 		response.Error = hierr.Errorf(
@@ -134,7 +100,11 @@ func (api *API) handleAddPackage(context *gin.Context) {
 		err      error
 	)
 
-	repository, err := api.newRepository(context)
+	repository, err := getRepository(
+		api.root,
+		context.Query("path"),
+		context.Query("system"),
+	)
 	if err != nil {
 		response.Status = http.StatusBadRequest
 		response.Error = hierr.Errorf(
@@ -169,11 +139,15 @@ func (api *API) handleAddPackage(context *gin.Context) {
 func (api *API) handleRemovePackage(context *gin.Context) {
 	var (
 		response    = newAPIResponse()
-		packageName = context.Param("package")
+		packageName = context.Param("name")
 		err         error
 	)
 
-	repository, err := api.newRepository(context)
+	repository, err := getRepository(
+		api.root,
+		context.Query("path"),
+		context.Query("system"),
+	)
 	if err != nil {
 		response.Error = hierr.Errorf(
 			err,
@@ -194,7 +168,7 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 func (api *API) handleEditPackage(context *gin.Context) {
 	var (
 		request     = context.Request
-		packageName = context.Param("package")
+		packageName = context.Param("name")
 		response    = newAPIResponse()
 		file        *os.File
 		filename    string
@@ -202,9 +176,13 @@ func (api *API) handleEditPackage(context *gin.Context) {
 	)
 
 	request.ParseForm()
-	pathNew := request.Form.Get("epoch_new")
+	rootNew := request.Form.Get("copy-to")
 
-	repository, err := api.newRepository(context)
+	repository, err := getRepository(
+		api.root,
+		context.Query("path"),
+		context.Query("system"),
+	)
 	if err != nil {
 		response.Error = hierr.Errorf(
 			err,
@@ -212,9 +190,9 @@ func (api *API) handleEditPackage(context *gin.Context) {
 		).Error()
 	}
 
-	if pathNew != "" {
+	if rootNew != "" {
 		filename, file, err = repository.GetPackageFile(packageName)
-		repository.SetPath(pathNew)
+		repository.SetPath(rootNew)
 	} else {
 		filename, file, err = api.copyFileFromRequest(
 			repository,
@@ -244,10 +222,14 @@ func (api *API) handleDescribePackage(context *gin.Context) {
 	var (
 		err         error
 		response    = newAPIResponse()
-		packageName = context.Param("package")
+		packageName = context.Param("name")
 	)
 
-	repository, err := api.newRepository(context)
+	repository, err := getRepository(
+		api.root,
+		context.Query("path"),
+		context.Query("system"),
+	)
 	if err != nil {
 		response.Error = hierr.Errorf(
 			err,
@@ -309,68 +291,6 @@ func (api *API) sendResponse(context *gin.Context, response APIResponse) {
 	}
 
 	context.Writer.WriteHeader(response.Status)
-}
-
-func (api *API) newRepository(context *gin.Context) (Repository, error) {
-	var (
-		system       = context.Param("system")
-		repo         = context.Param("repo")
-		epoch        = context.Param("epoch")
-		database     = context.Param("db")
-		architecture = context.Param("arch")
-		repoPath     = filepath.Join(api.root, repo)
-	)
-
-	err := api.validateRepoPaths(repoPath, epoch, database, architecture)
-	if err != nil {
-		return nil, hierr.Errorf(
-			err,
-			"can't validate repo paths: %s/%s/%s/%s",
-			repoPath, epoch, database, architecture,
-		)
-	}
-
-	return getRepository(
-		api.root,
-		filepath.Join(
-			repo,
-			epoch,
-			database,
-			architecture,
-		),
-		system,
-	)
-}
-
-func (api *API) validateRepoPaths(
-	repo string, epoch string, database string, architecture string,
-) error {
-	if _, err := os.Stat(repo); err != nil {
-		return hierr.Errorf(err, "can't stat repo %s", repo)
-	}
-
-	if epoch == "" {
-		return nil
-	}
-
-	if _, err := os.Stat(filepath.Join(repo, epoch)); err != nil {
-		return hierr.Errorf(
-			err, "can't stat repo's epoch %s/%s", repo, epoch,
-		)
-	}
-
-	if database == "" {
-		return nil
-	}
-
-	if _, err := os.Stat(filepath.Join(repo, epoch, database)); err != nil {
-		return hierr.Errorf(
-			err, "can't stat repo's epoch's database %s/%s/%s",
-			repo, epoch, database,
-		)
-	}
-
-	return nil
 }
 
 func (api *API) copyFileFromRequest(

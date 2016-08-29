@@ -6,9 +6,7 @@ tests:wait-file-matches $(tests:get-background-stderr $bg_repod) "serving" 1 2
 
 expected='Success = true
 Error = ""
-Status = 200
-
-[Data]
-  repositories = ["arch-repo", "ubuntu-repo"]'
+Data = ["arch-repo", "ubuntu-repo"]
+Status = 200'
 
 tests:assert-equals "$(:list-repositories curl)" "$expected"
