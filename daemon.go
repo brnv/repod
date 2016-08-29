@@ -3,7 +3,8 @@ package main
 import "github.com/gin-gonic/gin"
 
 const (
-	urlEpoches       = "/:repo"
+	urlSystems       = "/:system"
+	urlEpoches       = urlSystems + "/:repo"
 	urlDatabases     = urlEpoches + "/:epoch"
 	urlArchitectures = urlDatabases + "/:db"
 	urlPackages      = urlArchitectures + "/:arch"

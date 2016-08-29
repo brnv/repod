@@ -21,38 +21,39 @@ type Repository interface {
 	SetPath(path string)
 }
 
-const (
-	osArchLinux = "arch"
-	osUbuntu    = "ubuntu"
-	osUnknown   = "unknown"
-)
+func getRepositorySystem(path string) string {
+	switch {
+	case strings.HasPrefix(path, "arch"):
+		return "archlinux"
 
-func detectRepositoryOS(repository string) string {
-	if strings.HasPrefix(repository, "arch") {
-		return osArchLinux
+	case strings.HasPrefix(path, "debian"),
+		strings.HasPrefix(path, "ubuntu"):
+		return "debian"
+
+	default:
+		return ""
 	}
-
-	if strings.HasPrefix(repository, "ubuntu") {
-		return osUbuntu
-	}
-
-	return osUnknown
 }
 
-func getRepository(root string, path string) (Repository, error) {
-	osType := detectRepositoryOS(path)
+func getRepository(root, path, system string) (Repository, error) {
+	if system == "autodetect" {
+		system = getRepositorySystem(path)
+	}
 
-	switch osType {
-	case osArchLinux:
+	switch system {
+	case "arch", "archlinux":
 		return &RepositoryArch{
 			root: root,
 			path: path,
 		}, nil
 
+	case "ubuntu", "debian":
+		panic("not implemented")
+
 	default:
 		return nil, fmt.Errorf(
-			"repo manager for %s is not implemented",
-			osType,
+			"can't obtain repository system, try to specify --system <type>",
+			system,
 		)
 	}
 }

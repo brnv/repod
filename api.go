@@ -313,6 +313,7 @@ func (api *API) sendResponse(context *gin.Context, response APIResponse) {
 
 func (api *API) newRepository(context *gin.Context) (Repository, error) {
 	var (
+		system       = context.Param("system")
 		repo         = context.Param("repo")
 		epoch        = context.Param("epoch")
 		database     = context.Param("db")
@@ -337,6 +338,7 @@ func (api *API) newRepository(context *gin.Context) (Repository, error) {
 			database,
 			architecture,
 		),
+		system,
 	)
 }
 
