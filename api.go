@@ -23,16 +23,9 @@ type API struct {
 type APIResponse struct {
 	Success bool
 	Error   string
-	Data    map[string]interface{}
+	Data    interface{}
 	Status  int
 }
-
-const (
-	mapKeyRepositories = "repositories"
-	mapKeyEpoches      = "epoches"
-	mapKeyPackages     = "packages"
-	mapKeyPackage      = "package"
-)
 
 func newAPI(repoRoot string) *API {
 	return &API{
@@ -59,7 +52,7 @@ func (api *API) handleListRepositories(context *gin.Context) {
 		).Error()
 	}
 
-	response.Data[mapKeyRepositories] = repositories
+	response.Data = repositories
 
 	api.sendResponse(context, response)
 }
@@ -95,7 +88,7 @@ func (api *API) handleListEpoches(context *gin.Context) {
 		response.Error = fmt.Errorf("no epoches found for repo").Error()
 	}
 
-	response.Data[mapKeyEpoches] = epoches
+	response.Data = epoches
 
 	api.sendResponse(context, response)
 }
@@ -127,7 +120,7 @@ func (api *API) handleListPackages(context *gin.Context) {
 		}
 	}
 
-	response.Data[mapKeyPackages] = packages
+	response.Data = packages
 
 	api.sendResponse(context, response)
 }
@@ -260,7 +253,7 @@ func (api *API) handleDescribePackage(context *gin.Context) {
 	}
 
 	if repository != nil {
-		response.Data[mapKeyPackage], err = repository.DescribePackage(
+		response.Data, err = repository.DescribePackage(
 			packageName,
 		)
 		if err != nil {
