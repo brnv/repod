@@ -25,9 +25,9 @@ api_url="$_repod/v1"
     tests:put-string blankd.pid "$pid"
 }
 
-:run-daemon() {
-    :nucleus
+:nucleus
 
+:run-daemon() {
     tests:eval go-test:run \
         repod.test \
         --listen="$_repod" \

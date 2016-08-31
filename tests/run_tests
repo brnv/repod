@@ -24,6 +24,11 @@ import:source "github.com/reconquest/go-test.bash"
 }
 
 :main() {
+    trap :cleanup EXIT
+    :cleanup() {
+        pkill blankd
+    }
+
     :init
     :build
     :run "${@}"
