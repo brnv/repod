@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kovetskiy/toml"
@@ -20,7 +21,7 @@ type API struct {
 
 type APIResponse struct {
 	Message string
-	Data    interface{}
+	Data    string
 	Status  int
 }
 
@@ -83,7 +84,7 @@ func (api *API) handleListPackages(context *gin.Context) {
 		}
 	}
 
-	response.Data = packages
+	response.Data = strings.Join(packages, "\n")
 
 	api.sendResponse(context, response)
 }

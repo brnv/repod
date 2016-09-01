@@ -9,10 +9,10 @@ import (
 	"github.com/kovetskiy/hierr"
 )
 
-func listRepositories(root string) ([]string, error) {
+func listRepositories(root string) (string, error) {
 	repositoriesFileInfo, err := ioutil.ReadDir(root)
 	if err != nil {
-		return []string{}, hierr.Errorf(
+		return "", hierr.Errorf(
 			err,
 			`can't list repositories from root %s`, root,
 		)
@@ -23,7 +23,7 @@ func listRepositories(root string) ([]string, error) {
 		repositories = append(repositories, repository.Name())
 	}
 
-	return repositories, nil
+	return strings.Join(repositories, "\n"), nil
 }
 
 func listPackages(repository Repository) (string, error) {

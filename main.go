@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/kovetskiy/godocs"
 	"github.com/kovetskiy/lorg"
@@ -84,10 +83,7 @@ func main() {
 
 	switch {
 	case modeListRepositories:
-		repos := []string{}
-		repos, err = listRepositories(root)
-
-		output = strings.Join(repos, "\n")
+		output, err = listRepositories(root)
 
 	case args["--list"].(bool):
 		if path != "" {
