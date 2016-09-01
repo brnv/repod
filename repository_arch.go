@@ -120,8 +120,7 @@ func (arch *RepositoryArch) updateRepo(
 
 	if !force && string(stderr) != "" {
 		return fmt.Errorf(
-			"repo-add exec error, args: %#v, stderr: %s",
-			cmdOptions,
+			"repo-add exec error %s",
 			string(stderr),
 		)
 	}

@@ -20,7 +20,7 @@ type API struct {
 
 type APIResponse struct {
 	Success bool
-	Error   string
+	Message string
 	Data    interface{}
 	Status  int
 }
@@ -33,7 +33,6 @@ func newAPI(root string) *API {
 
 func newAPIResponse() APIResponse {
 	return APIResponse{
-		Data:    make(map[string]interface{}),
 		Status:  http.StatusOK,
 		Success: true,
 	}
@@ -45,7 +44,7 @@ func (api *API) handleListRepositories(context *gin.Context) {
 	repositories, err := listRepositories(api.root)
 	if err != nil {
 		response.Status = http.StatusInternalServerError
-		response.Error = hierr.Errorf(
+		response.Message = hierr.Errorf(
 			err, "can't read repo dir %s", api.root,
 		).Error()
 	}
@@ -69,7 +68,7 @@ func (api *API) handleListPackages(context *gin.Context) {
 	)
 	if err != nil {
 		response.Status = http.StatusBadRequest
-		response.Error = hierr.Errorf(
+		response.Message = hierr.Errorf(
 			err,
 			"can't start work with repo",
 		).Error()
@@ -79,7 +78,7 @@ func (api *API) handleListPackages(context *gin.Context) {
 		packages, err = repository.ListPackages()
 		if err != nil {
 			response.Status = http.StatusInternalServerError
-			response.Error = hierr.Errorf(
+			response.Message = hierr.Errorf(
 				err,
 				"can't list packages for repo",
 			).Error()
@@ -107,7 +106,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 	)
 	if err != nil {
 		response.Status = http.StatusBadRequest
-		response.Error = hierr.Errorf(
+		response.Message = hierr.Errorf(
 			err,
 			"can't start work with repo",
 		).Error()
@@ -116,7 +115,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 	if repository != nil {
 		filename, file, err = api.copyFileFromRequest(repository, request)
 		if err != nil {
-			response.Error = hierr.Errorf(
+			response.Message = hierr.Errorf(
 				err,
 				"can't get file from request",
 			).Error()
@@ -126,7 +125,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 	if file != nil {
 		err = repository.AddPackage(filename, file, false)
 		if err != nil {
-			response.Error = hierr.Errorf(
+			response.Message = hierr.Errorf(
 				err,
 				`can't add given package file %s`, filename,
 			).Error()
@@ -149,7 +148,7 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 		context.Query("system"),
 	)
 	if err != nil {
-		response.Error = hierr.Errorf(
+		response.Message = hierr.Errorf(
 			err,
 			"can't start work with repo",
 		).Error()
@@ -158,7 +157,7 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 	if repository != nil {
 		err = repository.RemovePackage(packageName)
 		if err != nil {
-			response.Error = err.Error()
+			response.Message = err.Error()
 		}
 	}
 
@@ -184,7 +183,7 @@ func (api *API) handleEditPackage(context *gin.Context) {
 		context.Query("system"),
 	)
 	if err != nil {
-		response.Error = hierr.Errorf(
+		response.Message = hierr.Errorf(
 			err,
 			"can't start work with repo",
 		).Error()
@@ -201,14 +200,14 @@ func (api *API) handleEditPackage(context *gin.Context) {
 	}
 
 	if err != nil {
-		response.Error = hierr.Errorf(
+		response.Message = hierr.Errorf(
 			err,
 			"can't prepare edit package",
 		).Error()
 	} else {
 		err = repository.AddPackage(filename, file, true)
 		if err != nil {
-			response.Error = hierr.Errorf(
+			response.Message = hierr.Errorf(
 				err,
 				"can't change package %s", packageName,
 			).Error()
@@ -231,7 +230,7 @@ func (api *API) handleDescribePackage(context *gin.Context) {
 		context.Query("system"),
 	)
 	if err != nil {
-		response.Error = hierr.Errorf(
+		response.Message = hierr.Errorf(
 			err,
 			"can't start work with repo",
 		).Error()
@@ -242,7 +241,7 @@ func (api *API) handleDescribePackage(context *gin.Context) {
 			packageName,
 		)
 		if err != nil {
-			response.Error = err.Error()
+			response.Message = err.Error()
 		}
 	}
 
@@ -275,7 +274,7 @@ func (api *API) handleAuthentificate(context *gin.Context) {
 }
 
 func (api *API) sendResponse(context *gin.Context, response APIResponse) {
-	if response.Error != "" {
+	if response.Message != "" {
 		response.Success = false
 
 		if response.Status == 0 {
