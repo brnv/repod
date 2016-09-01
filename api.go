@@ -19,7 +19,6 @@ type API struct {
 }
 
 type APIResponse struct {
-	Success bool
 	Message string
 	Data    interface{}
 	Status  int
@@ -33,8 +32,7 @@ func newAPI(root string) *API {
 
 func newAPIResponse() APIResponse {
 	return APIResponse{
-		Status:  http.StatusOK,
-		Success: true,
+		Status: http.StatusOK,
 	}
 }
 
@@ -132,6 +130,10 @@ func (api *API) handleAddPackage(context *gin.Context) {
 		}
 	}
 
+	if len(response.Message) == 0 {
+		response.Message = "package added"
+	}
+
 	api.sendResponse(context, response)
 }
 
@@ -159,6 +161,10 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 		if err != nil {
 			response.Message = err.Error()
 		}
+	}
+
+	if len(response.Message) == 0 {
+		response.Message = "package removed"
 	}
 
 	api.sendResponse(context, response)
@@ -275,8 +281,6 @@ func (api *API) handleAuthentificate(context *gin.Context) {
 
 func (api *API) sendResponse(context *gin.Context, response APIResponse) {
 	if response.Message != "" {
-		response.Success = false
-
 		if response.Status == 0 {
 			response.Status = http.StatusInternalServerError
 		}
