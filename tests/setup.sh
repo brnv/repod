@@ -26,7 +26,9 @@ api_url="$_repod/v1"
     tests:put-string blankd.pid "$pid"
 }
 
-:nucleus
+if [[ $mode == "daemon" ]]; then
+    :nucleus
+fi
 
 :run-daemon() {
     tests:eval go-test:run \
