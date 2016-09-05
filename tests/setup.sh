@@ -66,7 +66,7 @@ api_url="$_repod/v1"
 
 :list-repositories() {
     if [[ $mode == "cli" ]]; then
-        :run-local --list
+        :run-local --query
     else
         :curl $api_url/
     fi
@@ -78,7 +78,7 @@ api_url="$_repod/v1"
     shift 1
 
     if [[ $mode == "cli" ]]; then
-        :run-local --list $path --system $system
+        :run-local --query $path --system $system
     else
         :curl $api_url/list?path=$path\&system=$system
     fi

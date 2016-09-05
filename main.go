@@ -20,28 +20,26 @@ var usage = `repod, packages repository manager
 Usage:
   repod -h | --help
   repod [options] --listen <address> [--nucleus <address> --tls-cert <path>]
-  repod [options] -L [<path>]
+  repod [options] -Q [<path>]
   repod [options] -A <path> -f <path>
   repod [options] (-E|-S|-R) <path> <package> [-f <path>]
 
 Options:
-  --root <path>        Directory where repositories stored
-                        [default: /srv/http].
-  --listen <address>   Listen specified IP and port.
-  --nucleus <address>  Nucleus server address.
-  --tls-cert <path>    Path to nucleus ssl certificate file.
-
-  -E --edit            Edit package file, database or description.
-    --copy-to <path>   Specify database to copy package to.
-  -S --show            Describe package.
-  -R --remove          Remove package.
-  -A --add             Add package.
-    -f --file <path>   Specify file to be upload to repository.
-  -L --list            List packages and repositories.
-    <path>             Target repository path.
-    <package>          Target package to manipulate with.
-  -s --system <type>   Specify repository system [default: autodetect]
-  -h --help            Show this help.
+  -d --root <path>        Repositories directory [default: /srv/http].
+  -l --listen <address>   Listen specified IP and port.
+  -n --nucleus <address>  Nucleus server address.
+  -c --tls-cert <path>    Path to nucleus ssl certificate file.
+  -E --edit               Edit package file, database or description.
+    -t --copy-to <path>   Specify database to copy package to.
+  -S --show               Describe package.
+  -R --remove             Remove package.
+  -A --add                Add package.
+    -f --file <path>      Specify file to be upload to repository.
+  -Q --query              List packages and repositories.
+    <path>                Target repository path.
+    <package>             Target package to manipulate with.
+  -s --system <type>      Specify repository system [default: autodetect]
+  -h --help               Show this help.
 `
 
 func main() {
@@ -62,8 +60,8 @@ func main() {
 		nucleusAddress, _ = args["--nucleus"].(string)
 		tlsCert, _        = args["--tls-cert"].(string)
 
-		modeList, _          = args["--list"].(bool)
-		modeListRepositories = modeList && path == ""
+		modeQuery, _         = args["--query"].(bool)
+		modeListRepositories = modeQuery && path == ""
 
 		err        error
 		output     string
@@ -85,7 +83,7 @@ func main() {
 	case modeListRepositories:
 		output, err = listRepositories(root)
 
-	case args["--list"].(bool):
+	case args["--query"].(bool):
 		if path != "" {
 			output, err = listPackages(repository)
 		}
