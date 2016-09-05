@@ -126,7 +126,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 		if err != nil {
 			response.Message = hierr.Errorf(
 				err,
-				`can't add given package file %s`, filename,
+				`can't add package from file %s`, filename,
 			).Error()
 		}
 	}
@@ -158,14 +158,10 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 	}
 
 	if repository != nil {
-		err = repository.RemovePackage(packageName)
+		response.Message, err = repository.RemovePackage(packageName)
 		if err != nil {
 			response.Message = err.Error()
 		}
-	}
-
-	if len(response.Message) == 0 {
-		response.Message = "package removed"
 	}
 
 	api.sendResponse(context, response)

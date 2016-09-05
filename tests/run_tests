@@ -5,6 +5,8 @@ set -euo pipefail
 cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 source ../vendor/github.com/reconquest/import.bash/import.bash
 
+mode=${mode:-all}
+
 import:source "github.com/reconquest/tests.sh"
 import:source "github.com/reconquest/test-runner.bash"
 import:source "github.com/reconquest/go-test.bash"
@@ -31,6 +33,14 @@ import:source "github.com/reconquest/go-test.bash"
 
     :init
     :build
+
+    if [[ $mode == "all" ]]; then
+        echo "[running] cli mode"
+        mode=cli :run "${@}"
+        echo "[running] daemon mode"
+        mode=daemon
+    fi
+
     :run "${@}"
 
     go-test:merge-coverage

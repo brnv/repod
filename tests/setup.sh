@@ -1,5 +1,5 @@
 :curl() {
-    /bin/curl -s -u user:valid ${@}
+    tests:eval /bin/curl -s -u user:valid ${@}
 }
 
 tests:clone repod.test bin/
@@ -16,6 +16,7 @@ api_url="$_repod/v1"
     tests:make-tmp-dir nucleus
 
     local pid=""
+
     tests:value pid blankd \
         -d $(tests:get-tmp-dir)/nucleus/ \
         -e $(tests:get-tmp-dir)/nucleus-server \
@@ -49,18 +50,22 @@ api_url="$_repod/v1"
     local architecture="${4:-}"
 
     local testdir=$(tests:get-tmp-dir)
+
     local dir=$testdir/repositories/$repo/$epoch/$database/x86_64
     local packages=$testdir/packages/$repo/$epoch/$database/x86_64
 
     mkdir -p $dir
     mkdir -p $packages
+
+    if [[ $mode == "daemon" ]]; then
+        tests:run-background bg_repod :run-daemon
+        tests:wait-file-matches \
+            $(tests:get-background-stderr $bg_repod) "serving" 1 2
+    fi
 }
 
 :list-repositories() {
-    local run_method="$1"
-    shift 1
-
-    if [[ $run_method == "local" ]]; then
+    if [[ $mode == "cli" ]]; then
         :run-local --list
     else
         :curl $api_url/
@@ -68,22 +73,20 @@ api_url="$_repod/v1"
 }
 
 :list-packages() {
-    local run_method="$1"
-    local path="$2"
-    local system="${3:-archlinux}"
-    shift 2
+    local path="$1"
+    local system="${2:-archlinux}"
+    shift 1
 
-    if [[ $run_method == "local" ]]; then
-        :run-local --list $path
+    if [[ $mode == "cli" ]]; then
+        :run-local --list $path --system $system
     else
         :curl $api_url/list?path=$path\&system=$system
     fi
 }
 
 :add-package() {
-    local run_method="$1"
-    local path="$2"
-    shift 2
+    local path="$1"
+    shift 1
 
     local packages=${@}
 
@@ -98,39 +101,11 @@ api_url="$_repod/v1"
 
         pkgfile="$dir/$package-1-1-x86_64.pkg.tar.xz"
 
-        if [[ $run_method == "local" ]]; then
+        if [[ $mode == "cli" ]]; then
             :run-local --add $path --file="$pkgfile"
         else
             :curl -F package_file=@$pkgfile -XPOST \
                 $api_url/add?path=$path\&system=archlinux
-        fi
-    done
-}
-
-# TODO fix this
-:add-package-fail() {
-    local run_method="$1"
-    local path="$2"
-    shift 2
-
-    local packages=${@}
-
-    local testdir=$(tests:get-tmp-dir)
-    local dir=$testdir/packages/$path
-
-    for package in $packages; do
-        tests:ensure cp $testdir/PKGBUILD $dir/
-
-        PKGDEST=$dir PKGNAME=$package \
-            makepkg -p $testdir/PKGBUILD --clean --force
-
-        if [[ $run_method == "local" ]]; then
-            :run-local --add unknown_repo \
-                --file=$dir/$package-1-1-x86_64.pkg.tar.xz
-        else
-            :curl -F \
-                package_file=@$dir/$package-1-1-x86_64.pkg.tar.xz \
-                -XPOST $api_url/add?path=unknown_repo
         fi
     done
 }
@@ -146,12 +121,11 @@ api_url="$_repod/v1"
 }
 
 :remove-package() {
-    local run_method="$1"
-    local path="$2"
-    local package="$3"
-    shift 3
+    local path="$1"
+    local package="$2"
+    shift 2
 
-    if [[ $run_method == "local" ]]; then
+    if [[ $mode == "cli" ]]; then
         :run-local --remove $path $package
     else
         :curl -XDELETE $api_url/package/$package?path=$path\&system=archlinux
@@ -159,12 +133,11 @@ api_url="$_repod/v1"
 }
 
 :describe-package() {
-    local run_method="$1"
-    local path="$2"
-    local package="$3"
-    shift 3
+    local path="$1"
+    local package="$2"
+    shift 2
 
-    if [[ $run_method == "local" ]]; then
+    if [[ $mode == "cli" ]]; then
         :run-local --show $path $package
     else
         :curl $api_url/package/$package?path=$path\&system=archlinux
@@ -172,11 +145,10 @@ api_url="$_repod/v1"
 }
 
 :edit-package-description() {
-    local run_method="$1"
-    local path="$2"
-    local package="$3"
-    local description="$4"
-    shift 4
+    local path="$1"
+    local package="$2"
+    local description="$3"
+    shift 3
 
     local testdir=$(tests:get-tmp-dir)
     local dir=$testdir/repositories/$path
@@ -186,7 +158,7 @@ api_url="$_repod/v1"
     PKGDESC=$description PKGDEST=$dir PKGNAME=$package \
         makepkg -p $testdir/PKGBUILD --clean --force
 
-    if [[ $run_method == "local" ]]; then
+    if [[ $mode == "cli" ]]; then
         :run-local --edit $path $package \
             --file $dir/$package-1-1-x86_64.pkg.tar.xz
     else
@@ -197,18 +169,16 @@ api_url="$_repod/v1"
 }
 
 :copy-package-to-new-root() {
-    local run_method="$1"
-    local path="$2"
-    local package="$3"
-    local new_root="$4"
-    shift 4
+    local path="$1"
+    local package="$2"
+    local new_root="$3"
+    shift 3
 
-    if [[ $run_method == "local" ]]; then
+    if [[ $mode == "cli" ]]; then
         :run-local --edit $path $package \
             --copy-to $new_root
     else
         :curl -d "copy-to=$new_root" -XPATCH \
             $api_url/package/$package?path=$path\&system=archlinux
-
     fi
 }

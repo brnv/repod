@@ -175,13 +175,13 @@ func (arch *RepositoryArch) AddPackage(
 	return nil
 }
 
-func (arch RepositoryArch) RemovePackage(packageName string) error {
+func (arch RepositoryArch) RemovePackage(packageName string) (string, error) {
 	cmd := exec.Command(
 		"repo-remove", arch.getDatabaseFilepath(), packageName,
 	)
 	_, _, err := executil.Run(cmd)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	searchPattern := filepath.Join(
@@ -190,20 +190,20 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 
 	files, err := filepath.Glob(searchPattern)
 	if err != nil {
-		return hierr.Errorf(
+		return "", hierr.Errorf(
 			err,
 			`can't find files by searchPattern %s`, searchPattern,
 		)
 	}
 
 	if len(files) == 0 {
-		return fmt.Errorf("no packages found to remove")
+		return "", fmt.Errorf("no packages found to remove")
 	}
 
 	for _, file := range files {
 		err = os.Remove(file)
 		if err != nil {
-			return hierr.Errorf(
+			return "", hierr.Errorf(
 				err,
 				"can't remove package file %s",
 				file,
@@ -211,7 +211,7 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 		}
 	}
 
-	return nil
+	return "package removed", nil
 }
 
 func (arch RepositoryArch) DescribePackage(

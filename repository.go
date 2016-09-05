@@ -14,7 +14,7 @@ type Repository interface {
 	AddPackage(packageName string, file *os.File, force bool) error
 	CopyFileToRepo(packageName string, file io.Reader) (string, error)
 
-	RemovePackage(packageName string) error
+	RemovePackage(packageName string) (string, error)
 	DescribePackage(packageName string) (string, error)
 	GetPackageFile(packageName string) (string, *os.File, error)
 

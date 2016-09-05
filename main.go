@@ -104,7 +104,7 @@ func main() {
 		)
 
 	case args["--remove"].(bool):
-		err = repository.RemovePackage(packageName)
+		output, err = repository.RemovePackage(packageName)
 
 	}
 
