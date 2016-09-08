@@ -4,17 +4,19 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"strings"
 
-	"github.com/kovetskiy/hierr"
+	ser "github.com/reconquest/ser-go"
+	"github.com/seletskiy/hierr"
 )
 
-func listRepositories(root string) (string, error) {
+func listRepositories(root string) ([]string, error) {
+	tracef("reading root directory")
+
 	repositoriesFileInfo, err := ioutil.ReadDir(root)
 	if err != nil {
-		return "", hierr.Errorf(
+		return []string{}, hierr.Errorf(
 			err,
-			`can't list repositories from root %s`, root,
+			`can't read directory %s`, root,
 		)
 	}
 
@@ -23,97 +25,95 @@ func listRepositories(root string) (string, error) {
 		repositories = append(repositories, repository.Name())
 	}
 
-	return strings.Join(repositories, "\n"), nil
+	debugf("repositories: %#v", repositories)
+
+	return repositories, nil
 }
 
-func listPackages(repository Repository) (string, error) {
-	packages, err := repository.ListPackages()
-	if err != nil {
-		return "", hierr.Errorf(
-			err,
-			`can't list packages`,
-		)
-	}
+func addPackage(repository Repository, packagePath string) error {
+	tracef("opening given package file")
 
-	return strings.Join(packages, "\n"), nil
-}
-
-func addPackage(
-	repository Repository,
-	packagePath string,
-) (string, error) {
 	file, err := os.Open(packagePath)
 	if err != nil {
-		return "", hierr.Errorf(
-			err,
-			`can't open given file %s`, packagePath,
-		)
+		return hierr.Errorf(err, `can't open given file`)
 	}
 
-	_, err = repository.CopyFileToRepo(path.Base(file.Name()), file)
+	tracef("copying file to repository directory")
+
+	pathCopied, err := repository.CopyFileToRepo(path.Base(packagePath), file)
 	if err != nil {
-		return "", hierr.Errorf(
-			err,
-			"can't copy file to repository dir",
-		)
+		return hierr.Errorf(err, "can't copy file to destination")
 	}
 
-	err = repository.AddPackage(path.Base(packagePath), file, false)
+	debugf("copied file path: %s", pathCopied)
+
+	tracef("adding package to repository")
+
+	err = repository.AddPackage(pathCopied, forcePackageAdd)
 	if err != nil {
-		return "", hierr.Errorf(
-			err,
-			`can't add package from file %s`, packagePath,
-		)
+		return hierr.Errorf(err, `can't add package`)
 	}
 
-	return "package was successfully added", nil
+	return nil
 }
 
 func describePackage(
 	repository Repository, packageName string,
 ) (string, error) {
+	tracef("getting information about package")
+
 	description, err := repository.DescribePackage(packageName)
 	if err != nil {
-		return "", hierr.Errorf(
-			err,
-			`can't get package '%s' description`, packageName,
-		)
+		return "", hierr.Errorf(err, `can't get package description`)
 	}
+
+	debugf("package description: %#v", description)
 
 	return description, nil
 }
 
 func editPackage(
 	repository Repository, packageName string,
-	packageFile string, rootNew string,
-) (string, error) {
+	packagePath string, pathNew string,
+) error {
 	var (
-		filename string
-		file     *os.File
-		err      error
+		file *os.File
+		err  error
 	)
 
-	if rootNew != "" {
-		filename, file, err = repository.GetPackageFile(packageName)
+	if len(packagePath) > 0 {
+		tracef("opening given package file")
+
+		file, err = os.Open(packagePath)
 		if err != nil {
-			return "", hierr.Errorf(
+			return ser.Errorf(err, "can't open file")
+		}
+	}
+
+	if file == nil {
+		tracef("getting package file from repository")
+
+		file, err = repository.GetPackageFile(packageName)
+		if err != nil {
+			return ser.Errorf(
 				err,
-				"can't get package file %s", packageName,
+				"can't get package file from repository",
 			)
 		}
-		repository.SetPath(rootNew)
-	} else {
-		file, err = os.Open(packageFile)
-		if err != nil {
-			return "", err
-		}
-		filename = file.Name()
 	}
 
-	err = repository.AddPackage(filename, file, true)
+	if len(pathNew) > 0 {
+		tracef("changing target repository path")
+
+		repository.SetPath(pathNew)
+	}
+
+	tracef("editing package file")
+
+	err = repository.AddPackage(file.Name(), forcePackageEdit)
 	if err != nil {
-		return "", err
+		return ser.Errorf(err, "can't add package")
 	}
 
-	return "package was successfully edited", nil
+	return nil
 }

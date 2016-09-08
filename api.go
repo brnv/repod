@@ -9,278 +9,285 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kovetskiy/toml"
-	"github.com/reconquest/hierr"
+	"github.com/reconquest/ser-go"
 
 	nucleus "git.rn/devops/nucleus-go"
 )
 
 type API struct {
-	root     string
-	authNeed bool
+	root        string
+	nucleusAuth bool
 }
 
 type APIResponse struct {
-	Message string
-	Data    string
-	Status  int
+	Data  interface{}
+	Error string
+
+	successMessage string
 }
 
-func newAPI(root string) *API {
-	return &API{
-		root: root,
-	}
-}
+func (api *API) detectRepository(context *gin.Context) {
+	tracef("getting repository")
 
-func newAPIResponse() APIResponse {
-	return APIResponse{
-		Status: http.StatusOK,
+	var (
+		path     = context.Query("path")
+		system   = context.Query("system")
+		response = context.MustGet("response").(*APIResponse)
+
+		err error
+	)
+
+	if len(path) == 0 {
+		return
 	}
+
+	if len(system) == 0 {
+		system = getRepositorySystem(path)
+	}
+
+	debugf("path: %s, system: %s", path, system)
+
+	repository, err := getRepository(api.root, path, system)
+	if err != nil {
+		context.AbortWithError(http.StatusInternalServerError, err)
+		response.Error = ser.Errorf(err, "can't get repository").Error()
+		api.sendResponse(context)
+		return
+	}
+
+	if repository == nil {
+		context.AbortWithError(http.StatusBadRequest, err)
+		response.Error = ser.Errorf(err, "repository not detected").Error()
+		api.sendResponse(context)
+		return
+	}
+
+	debugf("repository: %s", repository)
+
+	context.Set("repository", repository)
 }
 
 func (api *API) handleListRepositories(context *gin.Context) {
-	response := newAPIResponse()
+	tracef("listing repositories")
+
+	response := context.MustGet("response").(*APIResponse)
 
 	repositories, err := listRepositories(api.root)
 	if err != nil {
-		response.Status = http.StatusInternalServerError
-		response.Message = hierr.Errorf(
-			err, "can't read repo dir %s", api.root,
-		).Error()
+		response.Error = ser.Errorf(err, "can't list repositories").Error()
 	}
 
 	response.Data = repositories
 
-	api.sendResponse(context, response)
+	api.sendResponse(context)
 }
 
 func (api *API) handleListPackages(context *gin.Context) {
 	var (
-		response = newAPIResponse()
-		packages []string
-		err      error
+		repository = context.MustGet("repository").(Repository)
+		response   = context.MustGet("response").(*APIResponse)
+
+		err error
 	)
 
-	repository, err := getRepository(
-		api.root,
-		context.Query("path"),
-		context.Query("system"),
-	)
+	tracef("listing packages")
+
+	packages, err := repository.ListPackages()
 	if err != nil {
-		response.Status = http.StatusBadRequest
-		response.Message = hierr.Errorf(
-			err,
-			"can't start work with repo",
-		).Error()
+		response.Error = ser.Errorf(err, "can't list packages").Error()
 	}
 
-	if repository != nil {
-		packages, err = repository.ListPackages()
-		if err != nil {
-			response.Status = http.StatusInternalServerError
-			response.Message = hierr.Errorf(
-				err,
-				"can't list packages for repo",
-			).Error()
-		}
+	debugf("packages: %#v", packages)
+
+	if len(packages) > 0 {
+		response.Data = strings.Join(packages, "\n")
 	}
 
-	response.Data = strings.Join(packages, "\n")
-
-	api.sendResponse(context, response)
+	api.sendResponse(context)
 }
 
 func (api *API) handleAddPackage(context *gin.Context) {
 	var (
-		request  = context.Request
-		response = newAPIResponse()
+		repository = context.MustGet("repository").(Repository)
+		response   = context.MustGet("response").(*APIResponse)
+
+		filename string
+		err      error
+	)
+
+	tracef("saving user submitted file")
+
+	filename, err = api.saveRequestFile(repository, context.Request)
+	if err != nil {
+		response.Error = ser.Errorf(
+			err,
+			"can't save file from request",
+		).Error()
+	}
+
+	if len(filename) > 0 {
+		tracef("adding package")
+
+		err = repository.AddPackage(filename, forcePackageAdd)
+		if err != nil {
+			response.Error = ser.Errorf(
+				err,
+				`can't add package from`,
+			).Error()
+		}
+	}
+
+	response.successMessage = "package added"
+
+	api.sendResponse(context)
+}
+
+func (api *API) handleRemovePackage(context *gin.Context) {
+	var (
+		repository  = context.MustGet("repository").(Repository)
+		response    = context.MustGet("response").(*APIResponse)
+		packageName = context.Param("name")
+
+		err error
+	)
+
+	tracef("removing package")
+
+	debugf("package name: %s", packageName)
+
+	err = repository.RemovePackage(packageName)
+	if err != nil {
+		response.Error = ser.Errorf(err, "can't remove package").Error()
+	}
+
+	response.successMessage = "package removed"
+
+	api.sendResponse(context)
+}
+
+func (api *API) handleEditPackage(context *gin.Context) {
+	var (
+		repository  = context.MustGet("repository").(Repository)
+		response    = context.MustGet("response").(*APIResponse)
+		packageName = context.Param("name")
+
 		file     *os.File
 		filename string
 		err      error
 	)
 
-	repository, err := getRepository(
-		api.root,
-		context.Query("path"),
-		context.Query("system"),
-	)
-	if err != nil {
-		response.Status = http.StatusBadRequest
-		response.Message = hierr.Errorf(
-			err,
-			"can't start work with repo",
-		).Error()
-	}
+	debugf("package name: %s", packageName)
 
-	if repository != nil {
-		filename, file, err = api.copyFileFromRequest(repository, request)
+	tracef("parsing request form data")
+
+	context.Request.ParseForm()
+	pathCopyTo := context.Request.Form.Get("copy-to")
+
+	if pathCopyTo == "" {
+		tracef("saving user submitted file")
+
+		filename, err = api.saveRequestFile(repository, context.Request)
 		if err != nil {
-			response.Message = hierr.Errorf(
+			response.Error = ser.Errorf(
 				err,
-				"can't get file from request",
+				"can't save file from request",
 			).Error()
 		}
-	}
-
-	if file != nil {
-		err = repository.AddPackage(filename, file, false)
-		if err != nil {
-			response.Message = hierr.Errorf(
-				err,
-				`can't add package from file %s`, filename,
-			).Error()
-		}
-	}
-
-	if len(response.Message) == 0 {
-		response.Message = "package added"
-	}
-
-	api.sendResponse(context, response)
-}
-
-func (api *API) handleRemovePackage(context *gin.Context) {
-	var (
-		response    = newAPIResponse()
-		packageName = context.Param("name")
-		err         error
-	)
-
-	repository, err := getRepository(
-		api.root,
-		context.Query("path"),
-		context.Query("system"),
-	)
-	if err != nil {
-		response.Message = hierr.Errorf(
-			err,
-			"can't start work with repo",
-		).Error()
-	}
-
-	if repository != nil {
-		response.Message, err = repository.RemovePackage(packageName)
-		if err != nil {
-			response.Message = err.Error()
-		}
-	}
-
-	api.sendResponse(context, response)
-}
-
-func (api *API) handleEditPackage(context *gin.Context) {
-	var (
-		request     = context.Request
-		packageName = context.Param("name")
-		response    = newAPIResponse()
-		file        *os.File
-		filename    string
-		err         error
-	)
-
-	request.ParseForm()
-	rootNew := request.Form.Get("copy-to")
-
-	repository, err := getRepository(
-		api.root,
-		context.Query("path"),
-		context.Query("system"),
-	)
-	if err != nil {
-		response.Message = hierr.Errorf(
-			err,
-			"can't start work with repo",
-		).Error()
-	}
-
-	if rootNew != "" {
-		filename, file, err = repository.GetPackageFile(packageName)
-		repository.SetPath(rootNew)
 	} else {
-		filename, file, err = api.copyFileFromRequest(
-			repository,
-			context.Request,
-		)
+		tracef("getting package file directly from repository")
+
+		file, err = repository.GetPackageFile(packageName)
+		if err != nil {
+			response.Error = ser.Errorf(
+				err,
+				"can't get package file",
+			).Error()
+		}
+
+		if file != nil {
+			filename = file.Name()
+		}
+
+		tracef("setting path to copy package to")
+
+		repository.SetPath(pathCopyTo)
 	}
 
-	if err != nil {
-		response.Message = hierr.Errorf(
-			err,
-			"can't prepare edit package",
-		).Error()
-	} else {
-		err = repository.AddPackage(filename, file, true)
+	debugf("filename: %s", filename)
+
+	if len(filename) > 0 {
+		tracef("editing package")
+
+		err = repository.AddPackage(filename, forcePackageEdit)
 		if err != nil {
-			response.Message = hierr.Errorf(
-				err,
-				"can't change package %s", packageName,
-			).Error()
+			response.Error = ser.Errorf(err, "can't edit package").Error()
 		}
 	}
 
-	api.sendResponse(context, response)
+	response.successMessage = "package edited"
+
+	api.sendResponse(context)
 }
 
 func (api *API) handleDescribePackage(context *gin.Context) {
 	var (
-		err         error
-		response    = newAPIResponse()
+		repository  = context.MustGet("repository").(Repository)
+		response    = context.MustGet("response").(*APIResponse)
 		packageName = context.Param("name")
 	)
 
-	repository, err := getRepository(
-		api.root,
-		context.Query("path"),
-		context.Query("system"),
-	)
+	tracef("describing package")
+
+	description, err := repository.DescribePackage(packageName)
 	if err != nil {
-		response.Message = hierr.Errorf(
-			err,
-			"can't start work with repo",
-		).Error()
+		response.Error = ser.Errorf(err, "can't describe package").Error()
 	}
 
-	if repository != nil {
-		response.Data, err = repository.DescribePackage(
-			packageName,
-		)
-		if err != nil {
-			response.Message = err.Error()
-		}
-	}
+	debugf("description: %s", description)
 
-	api.sendResponse(context, response)
+	response.Data = description
+
+	api.sendResponse(context)
 }
 
 func (api *API) handleAuthentificate(context *gin.Context) {
-	if !api.authNeed {
+	if !api.nucleusAuth {
 		return
 	}
 
-	_, token, ok := context.Request.BasicAuth()
+	tracef("handle basic authorization")
+
+	username, token, ok := context.Request.BasicAuth()
 	if !ok {
 		context.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 
+	debugf("username: %s, token: %s", username, token)
+
+	tracef("making nucleus authentication")
+
 	user, err := nucleus.Authenticate(token)
 	if err != nil {
 		errorln(
-			hierr.Errorf(
-				err, "can't authentificate using token '%s'", token,
-			),
+			ser.Errorf(err, "can't authentificate"),
 		)
 		context.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 
+	debugf("nucleus user: %#v", user)
+
 	context.Set("username", user.Name)
 }
 
-func (api *API) sendResponse(context *gin.Context, response APIResponse) {
-	if response.Message != "" {
-		if response.Status == 0 {
-			response.Status = http.StatusInternalServerError
-		}
+func (api *API) sendResponse(context *gin.Context) {
+	response := context.MustGet("response").(*APIResponse)
+
+	debugf("response: %#v", response)
+
+	if response.Data == nil && len(response.Error) == 0 {
+		response.Data = response.successMessage
 	}
 
 	err := toml.NewEncoder(context.Writer).Encode(response)
@@ -289,37 +296,33 @@ func (api *API) sendResponse(context *gin.Context, response APIResponse) {
 		context.Writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	context.Writer.WriteHeader(response.Status)
 }
 
-func (api *API) copyFileFromRequest(
-	repository Repository,
-	request *http.Request,
-) (string, *os.File, error) {
-	formFile, fileinfo, err := request.FormFile("package_file")
+func (api *API) saveRequestFile(
+	repository Repository, request *http.Request,
+) (string, error) {
+	tracef("getting form file")
+
+	formfile, header, err := request.FormFile("package_file")
 	if err != nil {
-		return "", nil, hierr.Errorf(err, "can't read form file from request")
+		return "", ser.Errorf(err, "can't read form file")
 	}
 
-	filePath, err := repository.CopyFileToRepo(
-		path.Base(fileinfo.Filename),
-		formFile,
+	tracef("copying file to repository")
+
+	pathCopied, err := repository.CopyFileToRepo(
+		path.Base(header.Filename),
+		formfile,
 	)
 	if err != nil {
-		return "", nil, hierr.Errorf(
-			err,
-			"can't copy file to repo",
-		)
+		return "", ser.Errorf(err, "can't copy file to repo")
 	}
 
-	file, err := os.Open(filePath)
-	if err != nil {
-		return "", nil, hierr.Errorf(
-			err,
-			"can't open file path %s", filePath,
-		)
-	}
+	debugf("saved file: %s", pathCopied)
 
-	return filePath, file, nil
+	return pathCopied, nil
+}
+
+func (api *API) prepareResponse(context *gin.Context) {
+	context.Set("response", &APIResponse{})
 }

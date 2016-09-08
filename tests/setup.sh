@@ -13,6 +13,8 @@ _nucleus="127.0.0.1:64777"
 api_url="$_repod/v1"
 
 :nucleus() {
+    pkill blankd || true
+
     tests:make-tmp-dir nucleus
 
     local pid=""
@@ -31,18 +33,22 @@ if [[ $mode == "daemon" ]]; then
 fi
 
 :run-daemon() {
+    pkill "repod.test" || true
+
     tests:eval go-test:run \
         repod.test \
         --listen="$_repod" \
         --root=$(tests:get-tmp-dir)/repositories/ \
         --nucleus "$_nucleus" \
-        --tls-cert $(tests:get-tmp-dir)/nucleus/tls.crt
+        --tls-cert $(tests:get-tmp-dir)/nucleus/tls.crt \
+        --debug
 }
 
 :run-local() {
     tests:eval go-test:run \
         repod.test \
-        --root=$(tests:get-tmp-dir)/repositories/ "${@}"
+        --root=$(tests:get-tmp-dir)/repositories/ "${@}" \
+        --debug
 }
 
 :bootstrap-repository() {
@@ -61,7 +67,7 @@ fi
 
     if [[ $mode == "daemon" ]]; then
         tests:run-background bg_repod :run-daemon
-        tests:wait-file-matches \
+        tests:ensure tests:wait-file-matches \
             $(tests:get-background-stderr $bg_repod) "serving" 1 2
     fi
 }
@@ -77,7 +83,6 @@ fi
 :list-packages() {
     local path="$1"
     local system="${2:-archlinux}"
-    shift 1
 
     if [[ $mode == "cli" ]]; then
         :run-local --query $path --system $system
@@ -180,7 +185,7 @@ fi
         :run-local --edit $path $package \
             --copy-to $new_root
     else
-        :curl -d "copy-to=$new_root" -XPATCH \
-            $api_url/package/$package?path=$path\&system=archlinux
+        :curl -XPATCH \
+            $api_url/package/$package?path=$path\&system=archlinux\&copy-to=$new_root
     fi
 }

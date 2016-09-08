@@ -9,7 +9,6 @@ tests:ensure :stat-package \
     arch-repo/testing/testing-db/x86_64 package_one
 
 :remove-package arch-repo/testing/testing-db/x86_64 package_one
-    tests:assert-stdout "package removed"
 
 tests:not tests:ensure :stat-package \
     arch-repo/testing/testing-db/x86_64 package_one

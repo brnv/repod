@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/kovetskiy/godocs"
 	"github.com/kovetskiy/lorg"
@@ -18,28 +19,29 @@ var (
 var usage = `repod, packages repository manager
 
 Usage:
-  repod -h | --help
-  repod [options] --listen <address> [--nucleus <address> --tls-cert <path>]
-  repod [options] -Q [<path>]
-  repod [options] -A <path> -f <path>
-  repod [options] (-E|-S|-R) <path> <package> [-f <path>]
+    repod -h | --help
+    repod [options] --listen <address> [--nucleus <address> --tls-cert <path>]
+    repod [options] -Q [<path>]
+    repod [options] -A <path> -f <path>
+    repod [options] (-E|-S|-R) <path> <package> [-f <path>]
 
 Options:
-  -d --root <path>        Repositories directory [default: /srv/http].
-  -l --listen <address>   Listen specified IP and port.
-  -n --nucleus <address>  Nucleus server address.
-  -c --tls-cert <path>    Path to nucleus ssl certificate file.
-  -E --edit               Edit package file, database or description.
-    -t --copy-to <path>   Specify database to copy package to.
-  -S --show               Describe package.
-  -R --remove             Remove package.
-  -A --add                Add package.
-    -f --file <path>      Specify file to be upload to repository.
-  -Q --query              List packages and repositories.
-    <path>                Target repository path.
-    <package>             Target package to manipulate with.
-  -s --system <type>      Specify repository system [default: autodetect]
-  -h --help               Show this help.
+    -d --root <path>        Repositories directory [default: /srv/http].
+    -l --listen <address>   Listen specified IP and port.
+    -n --nucleus <address>  Nucleus server address.
+    -c --tls-cert <path>    Path to nucleus ssl certificate file.
+    -E --edit               Edit package file, database or description.
+      -t --copy-to <path>   Specify database to copy package to.
+    -S --show               Describe package.
+    -R --remove             Remove package.
+    -A --add                Add package.
+      -f --file <path>      Specify file to be upload to repository.
+    -Q --query              List packages and repositories.
+      <path>                Target repository path.
+      <package>             Target package to manipulate with.
+    -s --system <type>      Specify repository system [default: autodetect]
+    --debug                 Show runtime debug information.
+    -h --help               Show this help.
 `
 
 func main() {
@@ -70,44 +72,56 @@ func main() {
 		system = args["--system"].(string)
 	)
 
+	if args["--debug"].(bool) {
+		logger.SetLevel(lorg.LevelTrace)
+	}
+
 	if listenAddress != "" {
-		runDaemon(root, listenAddress, nucleusAddress, tlsCert)
+		fatalln(
+			runServer(root, listenAddress, nucleusAddress, tlsCert),
+		)
 	}
 
 	repository, err = getRepository(root, path, system)
-	if err != nil && !modeListRepositories {
+	if repository == nil && !modeListRepositories && err != nil {
 		fatalln(err)
 	}
 
 	switch {
 	case modeListRepositories:
-		output, err = listRepositories(root)
+		var repositories []string
 
-	case args["--query"].(bool):
-		if path != "" {
-			output, err = listPackages(repository)
+		repositories, err = listRepositories(root)
+
+		if len(repositories) > 0 {
+			output = strings.Join(repositories, "\n")
+		}
+
+	case args["--query"].(bool) && path != "":
+		var packages []string
+
+		packages, err = repository.ListPackages()
+
+		if len(packages) > 0 {
+			output = strings.Join(packages, "\n")
 		}
 
 	case args["--add"].(bool):
-		output, err = addPackage(repository, packagePath)
+		err = addPackage(repository, packagePath)
 
 	case args["--show"].(bool):
-		output, err = describePackage(
-			repository, packageName,
-		)
+		output, err = describePackage(repository, packageName)
 
 	case args["--edit"].(bool):
-		output, err = editPackage(
-			repository, packageName, packagePath, rootNew,
-		)
+		err = editPackage(repository, packageName, packagePath, rootNew)
 
 	case args["--remove"].(bool):
-		output, err = repository.RemovePackage(packageName)
+		err = repository.RemovePackage(packageName)
 
 	}
 
 	if err != nil {
-		fatalf("%s", err)
+		fatalln(err)
 	}
 
 	if len(output) > 0 {

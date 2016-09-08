@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/kovetskiy/executil"
-	"github.com/reconquest/hierr"
+	"github.com/reconquest/ser-go"
 )
 
 type RepositoryArch struct {
@@ -21,108 +22,109 @@ type RepositoryArch struct {
 const formatPacmanConfRepo = "[%s]"
 
 func (arch RepositoryArch) ListPackages() ([]string, error) {
+	tracef("getting sync directory to list packages")
+
 	directory, err := arch.getSyncDirectory()
 	if err != nil {
-		return []string{}, hierr.Errorf(
-			err,
-			`can't prepare pacman sync directory`,
-		)
+		return []string{}, ser.Errorf(err, `can't get sync directory`)
 	}
+
+	defer os.RemoveAll(directory)
+
+	tracef("generating pacman config for sync")
 
 	config, err := arch.getPacmanConfig()
 	if err != nil {
-		os.RemoveAll(directory)
-		return []string{}, hierr.Errorf(
-			err,
-			`can't get pacman temporary config`,
-		)
+		return []string{}, ser.Errorf(err, `can't get pacman config`)
 	}
 
-	defer func() {
-		os.RemoveAll(directory)
-		os.RemoveAll(config)
-	}()
+	defer os.RemoveAll(config)
 
-	cmd := exec.Command(
-		"pacman", "--sync", "--list",
-		"--config", config,
-		"--dbpath", directory,
-	)
+	args := []string{
+		"--sync", "--list", "--debug",
+		"--config", config, "--dbpath", directory,
+	}
 
-	pacmanOutput, _, err := executil.Run(cmd)
+	debugf("pacman args: %#v", args)
+
+	cmd := exec.Command("pacman", args...)
+
+	stdout, stderr, err := executil.Run(cmd)
 	if err != nil {
-		return []string{}, hierr.Errorf(
-			err,
-			`can't execute command %s`, cmd,
-		)
+		return []string{}, ser.Errorf(err, `can't execute pacman command`)
 	}
 
-	packages := strings.Split(string(pacmanOutput), "\n")
+	if len(stdout) > 0 {
+		debugf("pacman stdout: %s", stdout)
+	}
+
+	if len(stderr) > 0 {
+		debugf("pacman stderr: %s", stderr)
+	}
+
+	packages := strings.Split(string(stdout), "\n")
 
 	return packages[:len(packages)-1], nil
 }
 
-func (arch *RepositoryArch) ListEpoches() ([]string, error) {
-	epochFiles, err := ioutil.ReadDir(arch.path)
-	if err != nil {
-		return []string{}, hierr.Errorf(
-			err,
-			`can't read dir %s`, arch.path,
-		)
-	}
-
-	epoches := []string{}
-	for _, epochFile := range epochFiles {
-		epoches = append(epoches, epochFile.Name())
-	}
-
-	return epoches, nil
-}
-
-func (arch *RepositoryArch) signUpPackage(
-	packageName string,
-) error {
-	cmd := exec.Command(
-		"gpg", "--detach-sign", "--yes",
+func (arch *RepositoryArch) signUpPackage(packageName string) error {
+	args := []string{
+		"--detach-sign",
+		"--yes",
 		packageName,
-	)
-
-	_, _, err := executil.Run(cmd)
-	if err != nil {
-		return err
 	}
+
+	debugf("gpg args: %#v", args)
+
+	stdout, stderr, err := executil.Run(
+		exec.Command("gpg", args...),
+	)
+	if err != nil {
+		return ser.Errorf(err, "error while executing gpg")
+	}
+
+	debugf("gpg stdout: %s", stdout)
+
+	debugf("gpg stderr: %s", stderr)
 
 	return nil
 }
 
 func (arch *RepositoryArch) updateRepo(
-	packageName string, packageFile io.Reader, force bool,
+	packageFile *os.File, force bool,
 ) error {
-	cmdOptions := []string{
+	args := []string{
 		"-s",
 		arch.getDatabaseFilepath(),
-		packageName,
+		packageFile.Name(),
 	}
 
 	if !force {
-		cmdOptions = append([]string{"-n"}, cmdOptions...)
+		args = append([]string{"-n"}, args...)
 	}
 
-	_, stderr, err := executil.Run(
-		exec.Command("repo-add", cmdOptions...),
+	debugf("repo-add args: %#v", args)
+
+	stdout, stderr, err := executil.Run(
+		exec.Command("repo-add", args...),
 	)
 	if err != nil {
-		return hierr.Errorf(
-			err,
-			"can't add package to repo, exec args: %#v", cmdOptions,
-		)
+		return ser.Errorf(err, "can't add package to repo")
 	}
 
-	if !force && string(stderr) != "" {
-		return fmt.Errorf(
-			"repo-add exec error %s",
-			string(stderr),
-		)
+	if len(stdout) > 0 {
+		debugf("repo-add stdout: %s", stdout)
+	}
+
+	if len(stderr) > 0 {
+		debugf("repo-add stderr: %s", stderr)
+
+		if !force {
+			return ser.Errorf(
+				errors.New(string(stderr)),
+				"repo-add exec error, see debug info",
+			)
+		}
 	}
 
 	return nil
@@ -131,124 +133,161 @@ func (arch *RepositoryArch) updateRepo(
 func (arch *RepositoryArch) CopyFileToRepo(
 	packageName string, packageFile io.Reader,
 ) (string, error) {
-	dstPackagePath := filepath.Join(arch.getPackagesPath(), packageName)
+	packagesDir := arch.getPackagesPath()
 
-	err := os.MkdirAll(filepath.Dir(dstPackagePath), 0644)
+	tracef("ensuring packages directory")
+
+	err := os.MkdirAll(packagesDir, 0644)
 	if err != nil {
-		return "", hierr.Errorf(
-			err, "can't create directory %s", filepath.Dir(dstPackagePath),
+		return "", ser.Errorf(
+			err, "can't create directory",
 		)
 	}
 
-	dstPackageFile, err := os.Create(dstPackagePath)
+	tracef("creating package file")
+
+	fileCopied, err := os.Create(filepath.Join(packagesDir, packageName))
 	if err != nil {
-		return "", hierr.Errorf(
-			err,
-			"can't create package file %s", packageName,
-		)
+		return "", ser.Errorf(err, "can't create file")
 	}
 
-	_, err = io.Copy(dstPackageFile, packageFile)
+	tracef("copying given file content to package file")
+
+	_, err = io.Copy(fileCopied, packageFile)
 	if err != nil {
-		return "", hierr.Errorf(
-			err,
-			"can't copy file content to destination",
-		)
+		return "", ser.Errorf(err, "can't copy file content")
 	}
 
-	return dstPackageFile.Name(), nil
+	return fileCopied.Name(), nil
 }
 
 func (arch *RepositoryArch) AddPackage(
-	packageName string, packageFile *os.File, force bool,
+	packagePath string, force bool,
 ) error {
-	err := arch.signUpPackage(packageFile.Name())
+	tracef("opening given package file")
+
+	file, err := os.Open(packagePath)
 	if err != nil {
-		return err
+		return ser.Errorf(err, "can't open given package file")
 	}
 
-	err = arch.updateRepo(packageName, packageFile, force)
+	tracef("signing up package")
+
+	err = arch.signUpPackage(file.Name())
 	if err != nil {
-		return err
+		return ser.Errorf(err, "can't sign up given package")
+	}
+
+	tracef("updating repository")
+
+	debugf("force mode: %#v", force)
+
+	err = arch.updateRepo(file, force)
+	if err != nil {
+		return ser.Errorf(err, "can't update repository")
 	}
 
 	return nil
 }
 
-func (arch RepositoryArch) RemovePackage(packageName string) (string, error) {
-	cmd := exec.Command(
-		"repo-remove", arch.getDatabaseFilepath(), packageName,
+func (arch RepositoryArch) RemovePackage(packageName string) error {
+	tracef("calling repo-remove")
+
+	args := []string{arch.getDatabaseFilepath(), packageName}
+
+	stdout, stderr, err := executil.Run(
+		exec.Command("repo-remove", args...),
 	)
-	_, _, err := executil.Run(cmd)
 	if err != nil {
-		return "", err
+		return ser.Errorf(err, "error while executing repo remove")
 	}
 
-	searchPattern := filepath.Join(
-		arch.getPackagesPath(), packageName,
-	) + "*.tar.xz"
+	debugf("repo-remove stdout: %s", stdout)
 
-	files, err := filepath.Glob(searchPattern)
+	debugf("repo-remove stderr: %s", stderr)
+
+	tracef("searching package in repository directory")
+
+	glob := packageName + "*.tar.xz"
+
+	debugf("glob pattern is: %s", glob)
+
+	files, err := filepath.Glob(filepath.Join(arch.getPackagesPath(), glob))
 	if err != nil {
-		return "", hierr.Errorf(
-			err,
-			`can't find files by searchPattern %s`, searchPattern,
-		)
+		return ser.Errorf(err, `can't do glob search`)
 	}
 
 	if len(files) == 0 {
-		return "", fmt.Errorf("no packages found to remove")
+		return fmt.Errorf("no packages found to remove")
 	}
 
+	debugf("files found: %#v", files)
+
+	tracef("removing files")
+
 	for _, file := range files {
+		debugf("removing file %s", file)
+
 		err = os.Remove(file)
 		if err != nil {
-			return "", hierr.Errorf(
-				err,
-				"can't remove package file %s",
-				file,
-			)
+			return ser.Errorf(err, "can't remove file")
 		}
 	}
 
-	return "package removed", nil
+	return nil
 }
 
 func (arch RepositoryArch) DescribePackage(
 	packageName string,
 ) (string, error) {
+	tracef("getting sync directory to describe package")
+
 	directory, err := arch.getSyncDirectory()
 	if err != nil {
 		return "", err
 	}
 
+	debugf("sync directory: %s", directory)
+
+	defer os.RemoveAll(directory)
+
+	tracef("generating pacman config for sync")
+
 	config, err := arch.getPacmanConfig()
 	if err != nil {
-		os.RemoveAll(directory)
-		return "", hierr.Errorf(
+		return "", ser.Errorf(
 			err,
 			`can't get pacman temporary config`,
 		)
 	}
 
-	defer func() {
-		os.RemoveAll(directory)
-		os.RemoveAll(config)
-	}()
+	debugf("pacman config: %s", config)
 
-	cmd := exec.Command(
-		"pacman", "--sync", "--info",
+	defer os.RemoveAll(config)
+
+	args := []string{
+		"--sync", "--info",
 		"--config", config,
-		"--dbpath", directory,
-		packageName,
-	)
-
-	pacmanOutput, _, err := executil.Run(cmd)
-	if err != nil {
-		return "", err
+		"--dbpath", directory, packageName,
 	}
 
-	return string(pacmanOutput), nil
+	debugf("pacman args: %#v", args)
+
+	stdout, stderr, err := executil.Run(
+		exec.Command("pacman", args...),
+	)
+	if err != nil {
+		return "", ser.Errorf(
+			err,
+			"pacman execution failed",
+		)
+	}
+
+	debugf("pacman stdout: %s", stdout)
+
+	debugf("pacman stderr: %s", stderr)
+
+	return string(stdout), nil
 }
 
 func (arch *RepositoryArch) getDatabaseName() string {
@@ -267,37 +306,6 @@ func (arch *RepositoryArch) getDatabaseFilepath() string {
 
 func (arch RepositoryArch) getPackagesPath() string {
 	return filepath.Join(arch.root, arch.path)
-}
-
-func (arch *RepositoryArch) prepareSyncDirectory(directory string) error {
-	syncDirectoryPath := directory + "/sync"
-
-	err := os.Mkdir(syncDirectoryPath, 0777)
-	if err != nil {
-		return hierr.Errorf(
-			err,
-			"can't create dir %s", syncDirectoryPath,
-		)
-	}
-
-	databaseLinkPath := filepath.Join(
-		syncDirectoryPath,
-		arch.getDatabaseFilename(),
-	)
-
-	err = os.Symlink(
-		arch.getDatabaseFilepath(),
-		databaseLinkPath,
-	)
-	if err != nil {
-		return hierr.Errorf(
-			err,
-			"can't symlink %s to %s",
-			arch.getDatabaseFilepath(), databaseLinkPath,
-		)
-	}
-
-	return nil
 }
 
 func (arch *RepositoryArch) getPacmanConfig() (string, error) {
@@ -320,59 +328,75 @@ func (arch *RepositoryArch) getPacmanConfig() (string, error) {
 }
 
 func (arch *RepositoryArch) getSyncDirectory() (string, error) {
-	directory, err := ioutil.TempDir("/tmp/", "repod-")
+	tracef("making temporary directory")
+
+	directoryTemp, err := ioutil.TempDir("/tmp/", "repod-")
 	if err != nil {
-		return "", hierr.Errorf(
-			err,
-			"can't create temp dir: %s",
-		)
+		return "", ser.Errorf(err, "can't get temporary directory")
 	}
 
-	err = arch.prepareSyncDirectory(directory)
+	debugf("temporary directory: %s", directoryTemp)
+
+	tracef("making sync directory")
+
+	directorySync := directoryTemp + "/sync"
+
+	err = os.Mkdir(directorySync, 0777)
 	if err != nil {
-		os.RemoveAll(directory)
-		return "", hierr.Errorf(
-			err,
-			`can't prepare pacman sync directory`,
-		)
+		return "", ser.Errorf(err, "can't make sync directory")
 	}
 
-	return directory, nil
+	debugf("sync directory: %s", directorySync)
+
+	tracef("symlinking database file to sync directory")
+
+	err = os.Symlink(
+		arch.getDatabaseFilepath(),
+		filepath.Join(directorySync, arch.getDatabaseFilename()),
+	)
+	if err != nil {
+		return "", ser.Errorf(err, "can't symlink database file")
+	}
+
+	return directoryTemp, nil
 }
 
 func (arch *RepositoryArch) GetPackageFile(
 	packageName string,
-) (string, *os.File, error) {
-	searchPattern := packageName + "*.tar.xz"
+) (*os.File, error) {
+	pattern := packageName + "*.tar.xz"
 
-	files, err := filepath.Glob(searchPattern)
+	files, err := filepath.Glob(pattern)
 	if err != nil {
-		return "", nil, hierr.Errorf(
+		return nil, ser.Errorf(
 			err,
-			`can't find files by searchPattern %s`, searchPattern,
+			`error while file search by pattern %s`, pattern,
 		)
 	}
 
 	if len(files) == 0 {
-		return "", nil, fmt.Errorf(
-			"no files found by searchPattern %s",
-			searchPattern,
+		return nil, ser.Errorf(
+			err,
+			"no files found by pattern %s", pattern,
 		)
 	}
 
 	if len(files) > 1 {
-		return "", nil, fmt.Errorf(
-			"more than one file found by searchPattern %s, %#v",
-			searchPattern, files,
+		return nil, ser.Errorf(
+			err,
+			"multiple files found by pattern %s", pattern,
 		)
 	}
 
 	file, err := os.Open(files[0])
 	if err != nil {
-		return "", nil, hierr.Errorf(err, `can't open file %s`, files[0])
+		return nil, ser.Errorf(
+			err,
+			`can't open file %s`, files[0],
+		)
 	}
 
-	return file.Name(), file, nil
+	return file, nil
 }
 
 func (arch *RepositoryArch) SetPath(path string) {

@@ -9,17 +9,21 @@ import (
 
 type Repository interface {
 	ListPackages() ([]string, error)
-	ListEpoches() ([]string, error)
 
-	AddPackage(packageName string, file *os.File, force bool) error
+	AddPackage(packageName string, force bool) error
 	CopyFileToRepo(packageName string, file io.Reader) (string, error)
 
-	RemovePackage(packageName string) (string, error)
+	RemovePackage(packageName string) error
 	DescribePackage(packageName string) (string, error)
-	GetPackageFile(packageName string) (string, *os.File, error)
+	GetPackageFile(packageName string) (*os.File, error)
 
 	SetPath(path string)
 }
+
+const (
+	forcePackageEdit = true
+	forcePackageAdd  = false
+)
 
 func getRepositorySystem(path string) string {
 	switch {
@@ -37,15 +41,14 @@ func getRepositorySystem(path string) string {
 
 func getRepository(root, path, system string) (Repository, error) {
 	if system == "autodetect" {
+		tracef("trying to detect repository type")
 		system = getRepositorySystem(path)
+		debugf("repository type: %s", system)
 	}
 
 	switch system {
 	case "arch", "archlinux":
-		return &RepositoryArch{
-			root: root,
-			path: path,
-		}, nil
+		return &RepositoryArch{root: root, path: path}, nil
 
 	case "ubuntu", "debian":
 		panic("not implemented")
