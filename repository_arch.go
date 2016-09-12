@@ -40,16 +40,16 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 
 	defer os.RemoveAll(config)
 
+	tracef("executing pacman")
+
 	args := []string{
 		"--sync", "--list", "--debug",
 		"--config", config, "--dbpath", directory,
 	}
 
-	debugf("pacman args: %#v", args)
-
-	cmd := exec.Command("pacman", args...)
-
-	stdout, stderr, err := executil.Run(cmd)
+	stdout, stderr, err := executil.Run(
+		exec.Command("pacman", args...),
+	)
 	if err != nil {
 		return []string{}, ser.Errorf(err, `can't execute pacman command`)
 	}
@@ -64,17 +64,17 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 
 	packages := strings.Split(string(stdout), "\n")
 
-	return packages[:len(packages)-1], nil
+	return packages, nil
 }
 
 func (arch *RepositoryArch) signUpPackage(packageName string) error {
+	tracef("executing gpg")
+
 	args := []string{
 		"--detach-sign",
 		"--yes",
 		packageName,
 	}
-
-	debugf("gpg args: %#v", args)
 
 	stdout, stderr, err := executil.Run(
 		exec.Command("gpg", args...),
@@ -93,6 +93,8 @@ func (arch *RepositoryArch) signUpPackage(packageName string) error {
 func (arch *RepositoryArch) updateRepo(
 	packageFile *os.File, force bool,
 ) error {
+	tracef("executing repo-add")
+
 	args := []string{
 		"-s",
 		arch.getDatabaseFilepath(),
@@ -102,8 +104,6 @@ func (arch *RepositoryArch) updateRepo(
 	if !force {
 		args = append([]string{"-n"}, args...)
 	}
-
-	debugf("repo-add args: %#v", args)
 
 	stdout, stderr, err := executil.Run(
 		exec.Command("repo-add", args...),
@@ -122,7 +122,7 @@ func (arch *RepositoryArch) updateRepo(
 		if !force {
 			return ser.Errorf(
 				errors.New(string(stderr)),
-				"repo-add exec error, see debug info",
+				"repo-add exec error",
 			)
 		}
 	}
@@ -130,7 +130,7 @@ func (arch *RepositoryArch) updateRepo(
 	return nil
 }
 
-func (arch *RepositoryArch) CopyFileToRepo(
+func (arch *RepositoryArch) CreatePackageFile(
 	packageName string, packageFile io.Reader,
 ) (string, error) {
 	packagesDir := arch.getPackagesPath()
@@ -146,19 +146,21 @@ func (arch *RepositoryArch) CopyFileToRepo(
 
 	tracef("creating package file")
 
-	fileCopied, err := os.Create(filepath.Join(packagesDir, packageName))
+	filepath := filepath.Join(packagesDir, packageName)
+
+	file, err := os.Create(filepath)
 	if err != nil {
-		return "", ser.Errorf(err, "can't create file")
+		return "", ser.Errorf(err, "can't create file %s", filepath)
 	}
 
-	tracef("copying given file content to package file")
+	tracef("copying given file content to new file")
 
-	_, err = io.Copy(fileCopied, packageFile)
+	_, err = io.Copy(file, packageFile)
 	if err != nil {
-		return "", ser.Errorf(err, "can't copy file content")
+		return "", ser.Errorf(err, "can't copy content to new file")
 	}
 
-	return fileCopied.Name(), nil
+	return file.Name(), nil
 }
 
 func (arch *RepositoryArch) AddPackage(
@@ -191,9 +193,12 @@ func (arch *RepositoryArch) AddPackage(
 }
 
 func (arch RepositoryArch) RemovePackage(packageName string) error {
-	tracef("calling repo-remove")
+	tracef("executing repo-remove")
 
-	args := []string{arch.getDatabaseFilepath(), packageName}
+	args := []string{
+		arch.getDatabaseFilepath(),
+		packageName,
+	}
 
 	stdout, stderr, err := executil.Run(
 		exec.Command("repo-remove", args...),
@@ -206,32 +211,18 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 
 	debugf("repo-remove stderr: %s", stderr)
 
-	tracef("searching package in repository directory")
+	tracef("getting package file path")
 
-	glob := packageName + "*.tar.xz"
-
-	debugf("glob pattern is: %s", glob)
-
-	files, err := filepath.Glob(filepath.Join(arch.getPackagesPath(), glob))
+	file, err := arch.GetPackageFile(packageName)
 	if err != nil {
-		return ser.Errorf(err, `can't do glob search`)
+		return ser.Errorf(err, "can't get package file")
 	}
 
-	if len(files) == 0 {
-		return fmt.Errorf("no packages found to remove")
-	}
+	tracef("removing file")
 
-	debugf("files found: %#v", files)
-
-	tracef("removing files")
-
-	for _, file := range files {
-		debugf("removing file %s", file)
-
-		err = os.Remove(file)
-		if err != nil {
-			return ser.Errorf(err, "can't remove file")
-		}
+	err = os.Remove(file.Name())
+	if err != nil {
+		return ser.Errorf(err, "can't remove file")
 	}
 
 	return nil
@@ -271,7 +262,7 @@ func (arch RepositoryArch) DescribePackage(
 		"--dbpath", directory, packageName,
 	}
 
-	debugf("pacman args: %#v", args)
+	tracef("executing pacman")
 
 	stdout, stderr, err := executil.Run(
 		exec.Command("pacman", args...),
@@ -364,39 +355,34 @@ func (arch *RepositoryArch) getSyncDirectory() (string, error) {
 func (arch *RepositoryArch) GetPackageFile(
 	packageName string,
 ) (*os.File, error) {
-	pattern := packageName + "*.tar.xz"
+	tracef("searching files")
 
-	files, err := filepath.Glob(pattern)
+	glob := packageName + "*.tar.xz"
+
+	debugf("pattern: %s", glob)
+
+	files, err := filepath.Glob(
+		filepath.Join(arch.getPackagesPath(), glob),
+	)
 	if err != nil {
-		return nil, ser.Errorf(
-			err,
-			`error while file search by pattern %s`, pattern,
-		)
+		return nil, ser.Errorf(err, `error while files searching`)
 	}
 
-	if len(files) == 0 {
-		return nil, ser.Errorf(
-			err,
-			"no files found by pattern %s", pattern,
-		)
-	}
+	switch len(files) {
+	case 0:
+		return nil, ser.Errorf(err, "no files found by pattern")
 
-	if len(files) > 1 {
-		return nil, ser.Errorf(
-			err,
-			"multiple files found by pattern %s", pattern,
-		)
-	}
+	case 1:
+		file, err := os.Open(files[0])
+		if err != nil {
+			return nil, ser.Errorf(err, "can't open given package file")
+		}
+		return file, nil
 
-	file, err := os.Open(files[0])
-	if err != nil {
-		return nil, ser.Errorf(
-			err,
-			`can't open file %s`, files[0],
-		)
-	}
+	default:
+		return nil, ser.Errorf(err, "multiple files found by pattern")
 
-	return file, nil
+	}
 }
 
 func (arch *RepositoryArch) SetPath(path string) {

@@ -5,7 +5,7 @@ import (
 	"os"
 	"path"
 
-	ser "github.com/reconquest/ser-go"
+	"github.com/reconquest/ser-go"
 	"github.com/seletskiy/hierr"
 )
 
@@ -16,7 +16,7 @@ func listRepositories(root string) ([]string, error) {
 	if err != nil {
 		return []string{}, hierr.Errorf(
 			err,
-			`can't read directory %s`, root,
+			`can't read root directory`,
 		)
 	}
 
@@ -40,36 +40,24 @@ func addPackage(repository Repository, packagePath string) error {
 
 	tracef("copying file to repository directory")
 
-	pathCopied, err := repository.CopyFileToRepo(path.Base(packagePath), file)
+	packageFilePath, err := repository.CreatePackageFile(
+		path.Base(packagePath),
+		file,
+	)
 	if err != nil {
 		return hierr.Errorf(err, "can't copy file to destination")
 	}
 
-	debugf("copied file path: %s", pathCopied)
+	debugf("copied file path: %s", packageFilePath)
 
 	tracef("adding package to repository")
 
-	err = repository.AddPackage(pathCopied, forcePackageAdd)
+	err = repository.AddPackage(packageFilePath, forcePackageAdd)
 	if err != nil {
 		return hierr.Errorf(err, `can't add package`)
 	}
 
 	return nil
-}
-
-func describePackage(
-	repository Repository, packageName string,
-) (string, error) {
-	tracef("getting information about package")
-
-	description, err := repository.DescribePackage(packageName)
-	if err != nil {
-		return "", hierr.Errorf(err, `can't get package description`)
-	}
-
-	debugf("package description: %#v", description)
-
-	return description, nil
 }
 
 func editPackage(

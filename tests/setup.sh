@@ -13,8 +13,6 @@ _nucleus="127.0.0.1:64777"
 api_url="$_repod/v1"
 
 :nucleus() {
-    pkill blankd || true
-
     tests:make-tmp-dir nucleus
 
     local pid=""
@@ -33,8 +31,6 @@ if [[ $mode == "daemon" ]]; then
 fi
 
 :run-daemon() {
-    pkill "repod.test" || true
-
     tests:eval go-test:run \
         repod.test \
         --listen="$_repod" \

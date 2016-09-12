@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -11,7 +10,7 @@ import (
 	"github.com/kovetskiy/toml"
 	"github.com/reconquest/ser-go"
 
-	nucleus "git.rn/devops/nucleus-go"
+	"git.rn/devops/nucleus-go"
 )
 
 type API struct {
@@ -23,7 +22,7 @@ type APIResponse struct {
 	Data  interface{}
 	Error string
 
-	successMessage string
+	message string
 }
 
 func (api *API) detectRepository(context *gin.Context) {
@@ -49,16 +48,16 @@ func (api *API) detectRepository(context *gin.Context) {
 
 	repository, err := getRepository(api.root, path, system)
 	if err != nil {
-		context.AbortWithError(http.StatusInternalServerError, err)
 		response.Error = ser.Errorf(err, "can't get repository").Error()
-		api.sendResponse(context)
+		context.AbortWithError(http.StatusInternalServerError, err)
+		sendResponse(context)
 		return
 	}
 
 	if repository == nil {
-		context.AbortWithError(http.StatusBadRequest, err)
 		response.Error = ser.Errorf(err, "repository not detected").Error()
-		api.sendResponse(context)
+		context.AbortWithError(http.StatusBadRequest, err)
+		sendResponse(context)
 		return
 	}
 
@@ -79,7 +78,7 @@ func (api *API) handleListRepositories(context *gin.Context) {
 
 	response.Data = repositories
 
-	api.sendResponse(context)
+	sendResponse(context)
 }
 
 func (api *API) handleListPackages(context *gin.Context) {
@@ -103,7 +102,7 @@ func (api *API) handleListPackages(context *gin.Context) {
 		response.Data = strings.Join(packages, "\n")
 	}
 
-	api.sendResponse(context)
+	sendResponse(context)
 }
 
 func (api *API) handleAddPackage(context *gin.Context) {
@@ -137,9 +136,9 @@ func (api *API) handleAddPackage(context *gin.Context) {
 		}
 	}
 
-	response.successMessage = "package added"
+	response.message = "package added"
 
-	api.sendResponse(context)
+	sendResponse(context)
 }
 
 func (api *API) handleRemovePackage(context *gin.Context) {
@@ -160,9 +159,9 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 		response.Error = ser.Errorf(err, "can't remove package").Error()
 	}
 
-	response.successMessage = "package removed"
+	response.message = "package removed"
 
-	api.sendResponse(context)
+	sendResponse(context)
 }
 
 func (api *API) handleEditPackage(context *gin.Context) {
@@ -170,6 +169,8 @@ func (api *API) handleEditPackage(context *gin.Context) {
 		repository  = context.MustGet("repository").(Repository)
 		response    = context.MustGet("response").(*APIResponse)
 		packageName = context.Param("name")
+
+		repositoryCopyTo = context.Query("copy-to")
 
 		file     *os.File
 		filename string
@@ -180,10 +181,7 @@ func (api *API) handleEditPackage(context *gin.Context) {
 
 	tracef("parsing request form data")
 
-	context.Request.ParseForm()
-	pathCopyTo := context.Request.Form.Get("copy-to")
-
-	if pathCopyTo == "" {
+	if repositoryCopyTo == "" {
 		tracef("saving user submitted file")
 
 		filename, err = api.saveRequestFile(repository, context.Request)
@@ -208,9 +206,9 @@ func (api *API) handleEditPackage(context *gin.Context) {
 			filename = file.Name()
 		}
 
-		tracef("setting path to copy package to")
+		tracef("setting repository to copy package to")
 
-		repository.SetPath(pathCopyTo)
+		repository.SetPath(repositoryCopyTo)
 	}
 
 	debugf("filename: %s", filename)
@@ -224,9 +222,9 @@ func (api *API) handleEditPackage(context *gin.Context) {
 		}
 	}
 
-	response.successMessage = "package edited"
+	response.message = "package edited"
 
-	api.sendResponse(context)
+	sendResponse(context)
 }
 
 func (api *API) handleDescribePackage(context *gin.Context) {
@@ -247,7 +245,7 @@ func (api *API) handleDescribePackage(context *gin.Context) {
 
 	response.Data = description
 
-	api.sendResponse(context)
+	sendResponse(context)
 }
 
 func (api *API) handleAuthentificate(context *gin.Context) {
@@ -281,23 +279,6 @@ func (api *API) handleAuthentificate(context *gin.Context) {
 	context.Set("username", user.Name)
 }
 
-func (api *API) sendResponse(context *gin.Context) {
-	response := context.MustGet("response").(*APIResponse)
-
-	debugf("response: %#v", response)
-
-	if response.Data == nil && len(response.Error) == 0 {
-		response.Data = response.successMessage
-	}
-
-	err := toml.NewEncoder(context.Writer).Encode(response)
-	if err != nil {
-		log.Printf("can't send response %#v", response)
-		context.Writer.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-}
-
 func (api *API) saveRequestFile(
 	repository Repository, request *http.Request,
 ) (string, error) {
@@ -310,7 +291,7 @@ func (api *API) saveRequestFile(
 
 	tracef("copying file to repository")
 
-	pathCopied, err := repository.CopyFileToRepo(
+	pathCopied, err := repository.CreatePackageFile(
 		path.Base(header.Filename),
 		formfile,
 	)
@@ -325,4 +306,24 @@ func (api *API) saveRequestFile(
 
 func (api *API) prepareResponse(context *gin.Context) {
 	context.Set("response", &APIResponse{})
+}
+
+func sendResponse(context *gin.Context) {
+	response := context.MustGet("response").(*APIResponse)
+
+	if response.Data == nil && len(response.Error) == 0 {
+		response.Data = response.message
+	}
+
+	debugf("response: %#v", response)
+
+	err := toml.NewEncoder(context.Writer).Encode(response)
+	if err != nil {
+		errorln(err)
+		context.AbortWithError(http.StatusInternalServerError, err)
+	}
+
+	if len(response.Error) > 0 {
+		errorln(response.Error)
+	}
 }

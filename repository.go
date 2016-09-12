@@ -11,7 +11,7 @@ type Repository interface {
 	ListPackages() ([]string, error)
 
 	AddPackage(packageName string, force bool) error
-	CopyFileToRepo(packageName string, file io.Reader) (string, error)
+	CreatePackageFile(packageName string, file io.Reader) (string, error)
 
 	RemovePackage(packageName string) error
 	DescribePackage(packageName string) (string, error)

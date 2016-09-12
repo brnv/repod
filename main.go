@@ -110,7 +110,7 @@ func main() {
 		err = addPackage(repository, packagePath)
 
 	case args["--show"].(bool):
-		output, err = describePackage(repository, packageName)
+		output, err = repository.DescribePackage(packageName)
 
 	case args["--edit"].(bool):
 		err = editPackage(repository, packageName, packagePath, rootNew)

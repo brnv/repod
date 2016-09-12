@@ -29,6 +29,7 @@ import:source "github.com/reconquest/go-test.bash"
     trap :cleanup EXIT
     :cleanup() {
         pkill blankd || true
+        pkill "repod.test" || true
     }
 
     :init

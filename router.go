@@ -32,15 +32,9 @@ func getRouterLogger() gin.HandlerFunc {
 
 		duration := time.Now().Sub(start)
 
-		username, ok := context.Get("username")
-		if !ok {
-			username = "-"
-		}
-
 		infof(
-			"%v %v %-4v %v %v %v",
+			"%v %-4v %v %v %v",
 			context.ClientIP(),
-			username,
 			context.Request.Method,
 			context.Request.RequestURI,
 			context.Writer.Status(),

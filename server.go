@@ -3,7 +3,7 @@ package main
 import (
 	"git.rn/devops/nucleus-go"
 	"github.com/gin-gonic/gin"
-	ser "github.com/reconquest/ser-go"
+	"github.com/reconquest/ser-go"
 )
 
 const (
@@ -62,23 +62,23 @@ func runServer(
 			api.handleListRepositories,
 		)
 		v1.Handle(
-			"GET", urlList,
+			"GET", "/list",
 			api.handleListPackages,
 		)
 		v1.Handle(
-			"POST", urlAdd,
+			"POST", "/add",
 			api.handleAddPackage,
 		)
 		v1.Handle(
-			"GET", urlPackage,
+			"GET", "/package/:name",
 			api.handleDescribePackage,
 		)
 		v1.Handle(
-			"DELETE", urlPackage,
+			"DELETE", "/package/:name",
 			api.handleRemovePackage,
 		)
 		v1.Handle(
-			"PATCH", urlPackage,
+			"PATCH", "/package/:name",
 			api.handleEditPackage,
 		)
 	}
