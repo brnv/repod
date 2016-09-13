@@ -10,6 +10,9 @@ tests:clone tests/mocks/nucleus-server .
 _repod="127.0.0.1:64444"
 _nucleus="127.0.0.1:64777"
 
+export package_ver=$RANDOM
+export package_rel=$RANDOM
+
 api_url="$_repod/v1"
 
 :nucleus() {
@@ -102,7 +105,7 @@ fi
         PKGDEST=$dir PKGNAME=$package \
             makepkg -p $testdir/PKGBUILD --clean --force
 
-        pkgfile="$dir/$package-1-1-x86_64.pkg.tar.xz"
+        pkgfile="$dir/$package-$package_ver-$package_rel-x86_64.pkg.tar.xz"
 
         if [[ $mode == "cli" ]]; then
             :run-local --add $path --file="$pkgfile"
@@ -120,7 +123,7 @@ fi
 
     local repodir="$(tests:get-tmp-dir)/repositories"
 
-    stat $repodir/$path/$package*.tar.xz
+    stat $repodir/$path/$package-[0-9]*-[0-9]*-*.tar.xz
 }
 
 :remove-package() {
@@ -163,10 +166,10 @@ fi
 
     if [[ $mode == "cli" ]]; then
         :run-local --edit $path $package \
-            --file $dir/$package-1-1-x86_64.pkg.tar.xz
+            --file $dir/$package-$package_ver-$package_rel-x86_64.pkg.tar.xz
     else
         :curl -F \
-            package_file=@$dir/$package-1-1-x86_64.pkg.tar.xz -XPATCH \
+            package_file=@$dir/$package-$package_ver-$package_rel-x86_64.pkg.tar.xz -XPATCH \
             $api_url/package/$package?path=$path\&system=archlinux
     fi
 }

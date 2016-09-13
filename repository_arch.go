@@ -357,13 +357,15 @@ func (arch *RepositoryArch) GetPackageFile(
 ) (*os.File, error) {
 	tracef("searching files")
 
-	glob := packageName + "*.tar.xz"
+	glob := fmt.Sprintf(
+		"%s/%s-[0-9]*-[0-9]*-*.pkg.tar.xz",
+		arch.getPackagesPath(),
+		packageName,
+	)
 
 	debugf("pattern: %s", glob)
 
-	files, err := filepath.Glob(
-		filepath.Join(arch.getPackagesPath(), glob),
-	)
+	files, err := filepath.Glob(glob)
 	if err != nil {
 		return nil, ser.Errorf(err, `error while files searching`)
 	}
