@@ -33,7 +33,7 @@ func getRouterLogger() gin.HandlerFunc {
 		duration := time.Now().Sub(start)
 
 		infof(
-			"%v %-4v %v %v %v",
+			`%s %s %s %v %v`,
 			context.ClientIP(),
 			context.Request.Method,
 			context.Request.RequestURI,
