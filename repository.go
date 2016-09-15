@@ -51,7 +51,7 @@ func getRepository(root, path, system string) (Repository, error) {
 		return &RepositoryArch{root: root, path: path}, nil
 
 	case "ubuntu", "debian":
-		panic("not implemented")
+		return nil, fmt.Errorf("system '%s' not implemented", system)
 
 	default:
 		return nil, fmt.Errorf(

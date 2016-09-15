@@ -55,8 +55,11 @@ func (api *API) detectRepository(context *gin.Context) {
 	}
 
 	if repository == nil {
-		response.Error = ser.Errorf(err, "repository not detected").Error()
-		context.AbortWithError(http.StatusBadRequest, err)
+		response.Error = ser.Errorf(
+			err,
+			"repository is not detected",
+		).Error()
+		context.AbortWithError(http.StatusNotFound, err)
 		sendResponse(context)
 		return
 	}
@@ -263,12 +266,12 @@ func (api *API) handleAuthentificate(context *gin.Context) {
 
 	debugf("username: %s, token: %s", username, token)
 
-	tracef("making nucleus authentication")
+	tracef("nucleus authentication")
 
 	user, err := nucleus.Authenticate(token)
 	if err != nil {
 		errorln(
-			ser.Errorf(err, "can't authentificate"),
+			ser.Errorf(err, "can't authentificate with nucleus"),
 		)
 		context.AbortWithStatus(http.StatusUnauthorized)
 		return

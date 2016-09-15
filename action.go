@@ -16,7 +16,7 @@ func listRepositories(root string) ([]string, error) {
 	if err != nil {
 		return []string{}, hierr.Errorf(
 			err,
-			`can't read root directory`,
+			"can't read root directory %s", root,
 		)
 	}
 
@@ -35,7 +35,10 @@ func addPackage(repository Repository, packagePath string) error {
 
 	file, err := os.Open(packagePath)
 	if err != nil {
-		return hierr.Errorf(err, `can't open given file`)
+		return hierr.Errorf(
+			err,
+			"can't open given file %s", packagePath,
+		)
 	}
 
 	tracef("copying file to repository directory")
@@ -45,7 +48,11 @@ func addPackage(repository Repository, packagePath string) error {
 		file,
 	)
 	if err != nil {
-		return hierr.Errorf(err, "can't copy file to destination")
+		return hierr.Errorf(
+			err,
+			"can't copy file %s to repository directory",
+			path.Base(packagePath),
+		)
 	}
 
 	debugf("copied file path: %s", packageFilePath)
@@ -54,7 +61,7 @@ func addPackage(repository Repository, packagePath string) error {
 
 	err = repository.AddPackage(packageFilePath, forcePackageAdd)
 	if err != nil {
-		return hierr.Errorf(err, `can't add package`)
+		return hierr.Errorf(err, `can't add package %s`, packagePath)
 	}
 
 	return nil
@@ -69,12 +76,15 @@ func editPackage(
 		err  error
 	)
 
-	if len(packagePath) > 0 {
-		tracef("opening given package file")
+	if len(packagePath) > 0 && file == nil {
+		tracef("trying to open package file")
 
 		file, err = os.Open(packagePath)
 		if err != nil {
-			return ser.Errorf(err, "can't open file")
+			return ser.Errorf(
+				err,
+				"can't open file %s", packagePath,
+			)
 		}
 	}
 
@@ -85,7 +95,7 @@ func editPackage(
 		if err != nil {
 			return ser.Errorf(
 				err,
-				"can't get package file from repository",
+				"can't get package '%s' from repository", packageName,
 			)
 		}
 	}
@@ -100,7 +110,10 @@ func editPackage(
 
 	err = repository.AddPackage(file.Name(), forcePackageEdit)
 	if err != nil {
-		return ser.Errorf(err, "can't add package")
+		return ser.Errorf(
+			err,
+			"can't edit package %s", packagePath,
+		)
 	}
 
 	return nil

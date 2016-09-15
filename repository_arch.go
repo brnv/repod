@@ -29,6 +29,8 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 		return []string{}, ser.Errorf(err, `can't get sync directory`)
 	}
 
+	debugf("sync directory: %s", directory)
+
 	defer os.RemoveAll(directory)
 
 	tracef("generating pacman config for sync")
@@ -37,6 +39,8 @@ func (arch RepositoryArch) ListPackages() ([]string, error) {
 	if err != nil {
 		return []string{}, ser.Errorf(err, `can't get pacman config`)
 	}
+
+	debugf("config: %s", config)
 
 	defer os.RemoveAll(config)
 
@@ -80,7 +84,7 @@ func (arch *RepositoryArch) signUpPackage(packageName string) error {
 		exec.Command("gpg", args...),
 	)
 	if err != nil {
-		return ser.Errorf(err, "error while executing gpg")
+		return ser.Errorf(err, "can't execute gpg")
 	}
 
 	debugf("gpg stdout: %s", stdout)
@@ -90,7 +94,7 @@ func (arch *RepositoryArch) signUpPackage(packageName string) error {
 	return nil
 }
 
-func (arch *RepositoryArch) updateRepo(
+func (arch *RepositoryArch) addPackage(
 	packageFile *os.File, force bool,
 ) error {
 	tracef("executing repo-add")
@@ -109,7 +113,7 @@ func (arch *RepositoryArch) updateRepo(
 		exec.Command("repo-add", args...),
 	)
 	if err != nil {
-		return ser.Errorf(err, "can't add package to repo")
+		return ser.Errorf(err, "can't execute repo-add")
 	}
 
 	if len(stdout) > 0 {
@@ -122,7 +126,7 @@ func (arch *RepositoryArch) updateRepo(
 		if !force {
 			return ser.Errorf(
 				errors.New(string(stderr)),
-				"repo-add exec error",
+				"repo-add errors",
 			)
 		}
 	}
@@ -133,20 +137,25 @@ func (arch *RepositoryArch) updateRepo(
 func (arch *RepositoryArch) CreatePackageFile(
 	packageName string, packageFile io.Reader,
 ) (string, error) {
+	tracef("ensuring packages directory")
+
 	packagesDir := arch.getPackagesPath()
 
-	tracef("ensuring packages directory")
+	debugf("packages directory: %s", packagesDir)
 
 	err := os.MkdirAll(packagesDir, 0644)
 	if err != nil {
 		return "", ser.Errorf(
-			err, "can't create directory",
+			err,
+			"can't create directory %s", packagesDir,
 		)
 	}
 
 	tracef("creating package file")
 
 	filepath := filepath.Join(packagesDir, packageName)
+
+	debugf("package file: %s", filepath)
 
 	file, err := os.Create(filepath)
 	if err != nil {
@@ -157,7 +166,10 @@ func (arch *RepositoryArch) CreatePackageFile(
 
 	_, err = io.Copy(file, packageFile)
 	if err != nil {
-		return "", ser.Errorf(err, "can't copy content to new file")
+		return "", ser.Errorf(
+			err,
+			"can't copy given file content to file %s", filepath,
+		)
 	}
 
 	return file.Name(), nil
@@ -166,27 +178,37 @@ func (arch *RepositoryArch) CreatePackageFile(
 func (arch *RepositoryArch) AddPackage(
 	packagePath string, force bool,
 ) error {
-	tracef("opening given package file")
+	tracef("reading given package file")
 
 	file, err := os.Open(packagePath)
 	if err != nil {
-		return ser.Errorf(err, "can't open given package file")
+		return ser.Errorf(
+			err,
+			"can't read given package file %s", packagePath,
+		)
 	}
 
-	tracef("signing up package")
+	tracef("signing up given package file")
 
 	err = arch.signUpPackage(file.Name())
 	if err != nil {
-		return ser.Errorf(err, "can't sign up given package")
+		return ser.Errorf(
+			err,
+			"can't sign up given package file %s", packagePath,
+		)
 	}
 
 	tracef("updating repository")
 
 	debugf("force mode: %#v", force)
 
-	err = arch.updateRepo(file, force)
+	err = arch.addPackage(file, force)
 	if err != nil {
-		return ser.Errorf(err, "can't update repository")
+		return ser.Errorf(
+			err,
+			"can't update repository with given package file %s",
+			packagePath,
+		)
 	}
 
 	return nil
@@ -204,25 +226,31 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 		exec.Command("repo-remove", args...),
 	)
 	if err != nil {
-		return ser.Errorf(err, "error while executing repo remove")
+		return ser.Errorf(err, "can't execute repo-remove")
 	}
 
 	debugf("repo-remove stdout: %s", stdout)
 
 	debugf("repo-remove stderr: %s", stderr)
 
-	tracef("getting package file path")
+	tracef("getting package file from repository")
 
 	file, err := arch.GetPackageFile(packageName)
 	if err != nil {
-		return ser.Errorf(err, "can't get package file")
+		return ser.Errorf(
+			err,
+			"can't get file for package %s", packageName,
+		)
 	}
 
 	tracef("removing file")
 
 	err = os.Remove(file.Name())
 	if err != nil {
-		return ser.Errorf(err, "can't remove file")
+		return ser.Errorf(
+			err,
+			"can't remove file %s", file.Name(),
+		)
 	}
 
 	return nil
@@ -231,11 +259,11 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 func (arch RepositoryArch) DescribePackage(
 	packageName string,
 ) (string, error) {
-	tracef("getting sync directory to describe package")
+	tracef("getting sync directory to describe packages")
 
 	directory, err := arch.getSyncDirectory()
 	if err != nil {
-		return "", err
+		return "", ser.Errorf(err, `can't get sync directory`)
 	}
 
 	debugf("sync directory: %s", directory)
@@ -246,10 +274,7 @@ func (arch RepositoryArch) DescribePackage(
 
 	config, err := arch.getPacmanConfig()
 	if err != nil {
-		return "", ser.Errorf(
-			err,
-			`can't get pacman temporary config`,
-		)
+		return "", ser.Errorf(err, `can't get pacman config`)
 	}
 
 	debugf("pacman config: %s", config)
@@ -268,10 +293,7 @@ func (arch RepositoryArch) DescribePackage(
 		exec.Command("pacman", args...),
 	)
 	if err != nil {
-		return "", ser.Errorf(
-			err,
-			"pacman execution failed",
-		)
+		return "", ser.Errorf(err, "can't execute pacman")
 	}
 
 	debugf("pacman stdout: %s", stdout)
@@ -300,19 +322,27 @@ func (arch RepositoryArch) getPackagesPath() string {
 }
 
 func (arch *RepositoryArch) getPacmanConfig() (string, error) {
+	tracef("making temporary config file")
+
 	config, err := ioutil.TempFile("/tmp/", "repod-pacman-config-")
 	if err != nil {
-		return "", err
+		return "", ser.Errorf(err, "can't make temporary file")
 	}
 
-	err = ioutil.WriteFile(
-		config.Name(),
-		[]byte(fmt.Sprintf(formatPacmanConfRepo, arch.getDatabaseName())),
-		0644,
-	)
+	debugf("temporary config file: %s", config)
 
+	tracef("write config content to temporary file")
+
+	content := fmt.Sprintf(formatPacmanConfRepo, arch.getDatabaseName())
+
+	debugf("config file content: '%s'", content)
+
+	err = ioutil.WriteFile(config.Name(), []byte(content), 0644)
 	if err != nil {
-		return "", err
+		return "", ser.Errorf(
+			err,
+			"can't write file %s", config,
+		)
 	}
 
 	return config.Name(), nil
@@ -323,7 +353,10 @@ func (arch *RepositoryArch) getSyncDirectory() (string, error) {
 
 	directoryTemp, err := ioutil.TempDir("/tmp/", "repod-")
 	if err != nil {
-		return "", ser.Errorf(err, "can't get temporary directory")
+		return "", ser.Errorf(
+			err,
+			"can't make temporary directory",
+		)
 	}
 
 	debugf("temporary directory: %s", directoryTemp)
@@ -332,9 +365,12 @@ func (arch *RepositoryArch) getSyncDirectory() (string, error) {
 
 	directorySync := directoryTemp + "/sync"
 
-	err = os.Mkdir(directorySync, 0777)
+	err = os.Mkdir(directorySync, 0770)
 	if err != nil {
-		return "", ser.Errorf(err, "can't make sync directory")
+		return "", ser.Errorf(
+			err,
+			"can't make sync directory %s", directorySync,
+		)
 	}
 
 	debugf("sync directory: %s", directorySync)
@@ -346,7 +382,11 @@ func (arch *RepositoryArch) getSyncDirectory() (string, error) {
 		filepath.Join(directorySync, arch.getDatabaseFilename()),
 	)
 	if err != nil {
-		return "", ser.Errorf(err, "can't symlink database file")
+		return "", ser.Errorf(
+			err,
+			"can't symlink database file to directory %s",
+			directorySync,
+		)
 	}
 
 	return directoryTemp, nil
@@ -355,29 +395,41 @@ func (arch *RepositoryArch) getSyncDirectory() (string, error) {
 func (arch *RepositoryArch) GetPackageFile(
 	packageName string,
 ) (*os.File, error) {
-	tracef("searching files")
+	tracef("finding package file in packages")
 
 	glob := fmt.Sprintf(
-		"%s/%s-[0-9]*-[0-9]*-*.pkg.tar.xz",
-		arch.getPackagesPath(),
+		"%s-[0-9]*-[0-9]*-*.pkg.tar.xz",
 		packageName,
 	)
 
 	debugf("pattern: %s", glob)
 
-	files, err := filepath.Glob(glob)
+	files, err := filepath.Glob(
+		filepath.Join(arch.getPackagesPath(), glob),
+	)
 	if err != nil {
-		return nil, ser.Errorf(err, `error while files searching`)
+		return nil, ser.Errorf(
+			err,
+			"can't find file in directory %s by pattern %s",
+			arch.getPackagesPath(), glob,
+		)
 	}
 
 	switch len(files) {
 	case 0:
-		return nil, ser.Errorf(err, "no files found by pattern")
+		return nil, ser.Errorf(
+			err,
+			"no files found by pattern %s",
+			glob,
+		)
 
 	case 1:
 		file, err := os.Open(files[0])
 		if err != nil {
-			return nil, ser.Errorf(err, "can't open given package file")
+			return nil, ser.Errorf(
+				err,
+				"can't open package file %s", files[0],
+			)
 		}
 		return file, nil
 

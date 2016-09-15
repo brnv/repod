@@ -6,12 +6,6 @@ import (
 	"github.com/reconquest/ser-go"
 )
 
-const (
-	urlList    = "/list"
-	urlAdd     = "/add"
-	urlPackage = "/package/:name"
-)
-
 func runServer(
 	repoRoot string, listenAddress string,
 	nucleusAddress string, tlsCert string,
