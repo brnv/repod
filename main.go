@@ -22,20 +22,21 @@ Usage:
     repod -h | --help
     repod [options] --listen <address> [--nucleus <address> --tls-cert <path>]
     repod [options] -Q [<path>]
-    repod [options] -A <path> -f <path>
-    repod [options] (-E|-S|-R) <path> <package> [-f <path>]
+    repod [options] -A <path> -f <path> [--force]
+    repod [options] (-C|-S|-R) <path> <package>
 
 Options:
     -d --root <path>        Repositories directory [default: /srv/http].
     -l --listen <address>   Listen specified IP and port.
     -n --nucleus <address>  Nucleus server address.
     -c --tls-cert <path>    Path to nucleus ssl certificate file.
-    -E --edit               Edit package file, database or description.
-      -t --copy-to <path>   Specify database to copy package to.
+    -C --copy               Copy package to another db path.
+      -t --copy-to <db>     Specify db path to copy package to.
     -S --show               Describe package.
     -R --remove             Remove package.
     -A --add                Add package.
       -f --file <path>      Specify file to be upload to repository.
+      --force               Force add.
     -Q --query              List packages and repositories.
       <path>                Target repository path.
       <package>             Target package to manipulate with.
@@ -56,7 +57,9 @@ func main() {
 		packageName, _ = args["<package>"].(string)
 		packagePath, _ = args["--file"].(string)
 
-		rootNew, _ = args["--copy-to"].(string)
+		forceAdd, _ = args["--force"].(bool)
+
+		pathNew, _ = args["--copy-to"].(string)
 
 		listenAddress, _  = args["--listen"].(string)
 		nucleusAddress, _ = args["--nucleus"].(string)
@@ -107,13 +110,13 @@ func main() {
 		}
 
 	case args["--add"].(bool):
-		err = addPackage(repository, packagePath)
+		err = addPackage(repository, packagePath, forceAdd)
 
 	case args["--show"].(bool):
 		output, err = repository.DescribePackage(packageName)
 
-	case args["--edit"].(bool):
-		err = editPackage(repository, packageName, packagePath, rootNew)
+	case args["--copy"].(bool):
+		err = repository.CopyPackage(packageName, pathNew)
 
 	case args["--remove"].(bool):
 		err = repository.RemovePackage(packageName)

@@ -157,20 +157,22 @@ fi
     shift 3
 
     local testdir=$(tests:get-tmp-dir)
-    local dir=$testdir/repositories/$path
+    local dir=$testdir/packages/$path
 
     cp $testdir/PKGBUILD $dir/
 
     PKGDESC=$description PKGDEST=$dir PKGNAME=$package \
         makepkg -p $testdir/PKGBUILD --clean --force
 
+    tree $(pwd)
+
     if [[ $mode == "cli" ]]; then
-        :run-local --edit $path $package \
+        :run-local --add $path --force \
             --file $dir/$package-$package_ver-$package_rel-x86_64.pkg.tar.xz
     else
         :curl -F \
-            package_file=@$dir/$package-$package_ver-$package_rel-x86_64.pkg.tar.xz -XPATCH \
-            $api_url/package/$package?path=$path\&system=archlinux
+            package_file=@$dir/$package-$package_ver-$package_rel-x86_64.pkg.tar.xz -XPOST \
+            $api_url/add?path=$path\&system=archlinux\&force=1
     fi
 }
 
@@ -181,10 +183,10 @@ fi
     shift 3
 
     if [[ $mode == "cli" ]]; then
-        :run-local --edit $path $package \
+        :run-local --copy $path $package \
             --copy-to $new_root
     else
-        :curl -XPATCH \
+        :curl -XPOST \
             $api_url/package/$package?path=$path\&system=archlinux\&copy-to=$new_root
     fi
 }

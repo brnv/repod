@@ -9,21 +9,13 @@ import (
 
 type Repository interface {
 	ListPackages() ([]string, error)
-
-	AddPackage(packageName string, force bool) error
+	AddPackage(packagePath string, force bool) error
+	CopyPackage(packageName string, pathNew string) error
 	CreatePackageFile(packageName string, file io.Reader) (string, error)
-
 	RemovePackage(packageName string) error
 	DescribePackage(packageName string) (string, error)
 	GetPackageFile(packageName string) (*os.File, error)
-
-	SetPath(path string)
 }
-
-const (
-	forcePackageEdit = true
-	forcePackageAdd  = false
-)
 
 func getRepositorySystem(path string) string {
 	switch {

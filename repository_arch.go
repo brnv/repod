@@ -22,8 +22,6 @@ type RepositoryArch struct {
 const formatPacmanConfRepo = "[%s]"
 
 func (arch RepositoryArch) ListPackages() ([]string, error) {
-	tracef("getting sync directory to list packages")
-
 	directory, err := arch.getSyncDirectory()
 	if err != nil {
 		return []string{}, ser.Errorf(err, `can't get sync directory`)
@@ -214,6 +212,42 @@ func (arch *RepositoryArch) AddPackage(
 	return nil
 }
 
+func (arch *RepositoryArch) CopyPackage(
+	packageName string,
+	pathNew string,
+) error {
+	var (
+		file *os.File
+		err  error
+	)
+
+	tracef("getting package file from repository")
+
+	file, err = arch.GetPackageFile(packageName)
+	if err != nil {
+		return ser.Errorf(
+			err,
+			"can't get package '%s' from repository", packageName,
+		)
+	}
+
+	tracef("changing target repository path")
+
+	arch.SetPath(pathNew)
+
+	tracef("copying package file")
+
+	err = arch.AddPackage(file.Name(), true)
+	if err != nil {
+		return ser.Errorf(
+			err,
+			"can't copy package %s to path %s", packageName, pathNew,
+		)
+	}
+
+	return nil
+}
+
 func (arch RepositoryArch) RemovePackage(packageName string) error {
 	tracef("executing repo-remove")
 
@@ -259,18 +293,12 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 func (arch RepositoryArch) DescribePackage(
 	packageName string,
 ) (string, error) {
-	tracef("getting sync directory to describe packages")
-
 	directory, err := arch.getSyncDirectory()
 	if err != nil {
 		return "", ser.Errorf(err, `can't get sync directory`)
 	}
 
-	debugf("sync directory: %s", directory)
-
 	defer os.RemoveAll(directory)
-
-	tracef("generating pacman config for sync")
 
 	config, err := arch.getPacmanConfig()
 	if err != nil {
@@ -322,14 +350,16 @@ func (arch RepositoryArch) getPackagesPath() string {
 }
 
 func (arch *RepositoryArch) getPacmanConfig() (string, error) {
-	tracef("making temporary config file")
+	tracef("generating pacman config")
+
+	tracef("making temporary file")
 
 	config, err := ioutil.TempFile("/tmp/", "repod-pacman-config-")
 	if err != nil {
 		return "", ser.Errorf(err, "can't make temporary file")
 	}
 
-	debugf("temporary config file: %s", config)
+	debugf("temporary file: %s", config.Name())
 
 	tracef("write config content to temporary file")
 
@@ -349,6 +379,8 @@ func (arch *RepositoryArch) getPacmanConfig() (string, error) {
 }
 
 func (arch *RepositoryArch) getSyncDirectory() (string, error) {
+	tracef("getting sync directory")
+
 	tracef("making temporary directory")
 
 	directoryTemp, err := ioutil.TempDir("/tmp/", "repod-")
@@ -377,10 +409,20 @@ func (arch *RepositoryArch) getSyncDirectory() (string, error) {
 
 	tracef("symlinking database file to sync directory")
 
-	err = os.Symlink(
-		arch.getDatabaseFilepath(),
-		filepath.Join(directorySync, arch.getDatabaseFilename()),
+	databaseFile := arch.getDatabaseFilepath()
+
+	databaseFileSync := filepath.Join(
+		directorySync,
+		arch.getDatabaseFilename(),
 	)
+
+	debugf(
+		"symlinking source: %s, destination: %s",
+		databaseFile,
+		databaseFileSync,
+	)
+
+	err = os.Symlink(databaseFile, databaseFileSync)
 	if err != nil {
 		return "", ser.Errorf(
 			err,

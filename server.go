@@ -47,9 +47,8 @@ func runServer(
 		"/v1/",
 		api.handleAuthentificate,
 		api.prepareResponse,
-		api.detectRepository,
+		api.readRequestParams,
 	)
-
 	{
 		v1.Handle(
 			"GET", "/",
@@ -72,8 +71,8 @@ func runServer(
 			api.handleRemovePackage,
 		)
 		v1.Handle(
-			"PATCH", "/package/:name",
-			api.handleEditPackage,
+			"POST", "/package/:name",
+			api.handleCopyPackage,
 		)
 	}
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"os"
 	"path"
 	"strings"
 
@@ -25,12 +24,13 @@ type APIResponse struct {
 	message string
 }
 
-func (api *API) detectRepository(context *gin.Context) {
+func (api *API) readRequestParams(context *gin.Context) {
 	tracef("getting repository")
 
 	var (
 		path     = context.Query("path")
 		system   = context.Query("system")
+		force    = context.Query("force")
 		response = context.MustGet("response").(*APIResponse)
 
 		err error
@@ -67,6 +67,11 @@ func (api *API) detectRepository(context *gin.Context) {
 	debugf("repository: %s", repository)
 
 	context.Set("repository", repository)
+
+	context.Set("force", false)
+	if force == "1" {
+		context.Set("force", true)
+	}
 }
 
 func (api *API) handleListRepositories(context *gin.Context) {
@@ -112,6 +117,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 	var (
 		repository = context.MustGet("repository").(Repository)
 		response   = context.MustGet("response").(*APIResponse)
+		forceAdd   = context.MustGet("force").(bool)
 
 		filename string
 		err      error
@@ -130,11 +136,11 @@ func (api *API) handleAddPackage(context *gin.Context) {
 	if len(filename) > 0 {
 		tracef("adding package")
 
-		err = repository.AddPackage(filename, forcePackageAdd)
+		err = repository.AddPackage(filename, forceAdd)
 		if err != nil {
 			response.Error = ser.Errorf(
 				err,
-				`can't add package from`,
+				`can't add package`,
 			).Error()
 		}
 	}
@@ -167,65 +173,21 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 	sendResponse(context)
 }
 
-func (api *API) handleEditPackage(context *gin.Context) {
+func (api *API) handleCopyPackage(context *gin.Context) {
 	var (
 		repository  = context.MustGet("repository").(Repository)
 		response    = context.MustGet("response").(*APIResponse)
 		packageName = context.Param("name")
 
-		repositoryCopyTo = context.Query("copy-to")
-
-		file     *os.File
-		filename string
-		err      error
+		pathNew = context.Query("copy-to")
 	)
 
-	debugf("package name: %s", packageName)
-
-	tracef("parsing request form data")
-
-	if repositoryCopyTo == "" {
-		tracef("saving user submitted file")
-
-		filename, err = api.saveRequestFile(repository, context.Request)
-		if err != nil {
-			response.Error = ser.Errorf(
-				err,
-				"can't save file from request",
-			).Error()
-		}
-	} else {
-		tracef("getting package file directly from repository")
-
-		file, err = repository.GetPackageFile(packageName)
-		if err != nil {
-			response.Error = ser.Errorf(
-				err,
-				"can't get package file",
-			).Error()
-		}
-
-		if file != nil {
-			filename = file.Name()
-		}
-
-		tracef("setting repository to copy package to")
-
-		repository.SetPath(repositoryCopyTo)
+	err := repository.CopyPackage(packageName, pathNew)
+	if err != nil {
+		response.Error = ser.Errorf(err, "can't edit package").Error()
 	}
 
-	debugf("filename: %s", filename)
-
-	if len(filename) > 0 {
-		tracef("editing package")
-
-		err = repository.AddPackage(filename, forcePackageEdit)
-		if err != nil {
-			response.Error = ser.Errorf(err, "can't edit package").Error()
-		}
-	}
-
-	response.message = "package edited"
+	response.message = "package copied"
 
 	sendResponse(context)
 }
