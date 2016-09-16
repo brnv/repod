@@ -226,8 +226,6 @@ func (api *API) handleAuthentificate(context *gin.Context) {
 		return
 	}
 
-	debugf("username: %s, token: %s", username, token)
-
 	tracef("nucleus authentication")
 
 	user, err := nucleus.Authenticate(token)
@@ -239,9 +237,16 @@ func (api *API) handleAuthentificate(context *gin.Context) {
 		return
 	}
 
-	debugf("nucleus user: %#v", user)
-
-	context.Set("username", user.Name)
+	if user.Name != username {
+		errorln(
+			ser.Errorf(
+				err,
+				"nucleus user not matched with request user",
+			),
+		)
+		context.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
 }
 
 func (api *API) saveRequestFile(
