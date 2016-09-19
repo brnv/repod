@@ -397,7 +397,7 @@ func (arch *RepositoryArch) getSyncDirectory() (string, error) {
 
 	directorySync := directoryTemp + "/sync"
 
-	err = os.Mkdir(directorySync, 0770)
+	err = os.Mkdir(directorySync, 0700)
 	if err != nil {
 		return "", ser.Errorf(
 			err,
