@@ -28,8 +28,7 @@ import:source "github.com/reconquest/go-test.bash"
 :main() {
     trap :cleanup EXIT
     :cleanup() {
-        pkill blankd || true
-        pkill "repod.test" || true
+        go-test:merge-coverage
     }
 
     :init
@@ -43,8 +42,6 @@ import:source "github.com/reconquest/go-test.bash"
     fi
 
     :run "${@}"
-
-    go-test:merge-coverage
 }
 
 :main "${@}"
