@@ -10,7 +10,7 @@ func runServer(
 	repoRoot string, listenAddress string,
 	nucleusAddress string, tlsCert string,
 ) error {
-	tracef("running server")
+	debugf("running server")
 
 	var (
 		router = gin.New()
@@ -18,16 +18,16 @@ func runServer(
 		err    error
 	)
 
-	debugf("api: %#v", api)
+	tracef("api: %#v", api)
 
 	if nucleusAddress != "" {
-		tracef("nucleus authorization required")
+		debugf("nucleus authorization required")
 
-		api.nucleusAuth = true
+		api.authEnabled = true
 	}
 
 	if tlsCert != "" {
-		tracef("using given tls certificate")
+		debugf("using given tls certificate")
 
 		err = nucleus.AddCertificateFile(tlsCert)
 		if err != nil {
@@ -41,7 +41,7 @@ func runServer(
 		nucleus.SetUserAgent("repod/" + version)
 	}
 
-	router.Use(getRouterRecovery(), getRouterLogger())
+	router.Use(getRouterRecovery, getRouterLogger)
 
 	v1 := router.Group(
 		"/v1/",

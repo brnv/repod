@@ -13,6 +13,8 @@ tests:ensure :stat-package \
 
 :remove-package arch-repo/testing/testing-db/x86_64 package
 
+:list-packages arch-repo/testing/testing-db/x86_64
+
 tests:ensure :stat-package \
     arch-repo/testing/testing-db/x86_64 package-one
 

@@ -33,9 +33,9 @@ func getRepositorySystem(path string) string {
 
 func getRepository(root, path, system string) (Repository, error) {
 	if system == "autodetect" {
-		tracef("trying to detect repository type")
+		debugf("trying to detect repository type")
 		system = getRepositorySystem(path)
-		debugf("repository type: %s", system)
+		tracef("repository type: '%s'", system)
 	}
 
 	switch system {

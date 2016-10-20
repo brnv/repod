@@ -65,9 +65,6 @@ func main() {
 		nucleusAddress, _ = args["--nucleus"].(string)
 		tlsCert, _        = args["--tls-cert"].(string)
 
-		modeQuery, _         = args["--query"].(bool)
-		modeListRepositories = modeQuery && path == ""
-
 		err        error
 		output     string
 		repository Repository
@@ -76,31 +73,37 @@ func main() {
 	)
 
 	if args["--debug"].(bool) {
-		logger.SetLevel(lorg.LevelTrace)
+		logger.SetLevel(lorg.LevelDebug)
 	}
 
 	if listenAddress != "" {
 		fatalln(
 			runServer(root, listenAddress, nucleusAddress, tlsCert),
 		)
+
+		return
 	}
 
-	repository, err = getRepository(root, path, system)
-	if repository == nil && !modeListRepositories && err != nil {
-		fatalln(err)
-	}
-
-	switch {
-	case modeListRepositories:
+	if args["--query"].(bool) && path == "" {
 		var repositories []string
 
 		repositories, err = listRepositories(root)
 
 		if len(repositories) > 0 {
-			output = strings.Join(repositories, "\n")
+			fmt.Println(strings.Join(repositories, "\n"))
 		}
 
-	case args["--query"].(bool) && path != "":
+		return
+	}
+
+	repository, err = getRepository(root, path, system)
+	if err != nil {
+		fatalln(err)
+	}
+
+	switch {
+
+	case args["--query"].(bool):
 		var packages []string
 
 		packages, err = repository.ListPackages()

@@ -8,39 +8,35 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func getRouterRecovery() gin.HandlerFunc {
-	return func(context *gin.Context) {
-		defer func() {
-			if err := recover(); err != nil {
-				stack := getStack(3)
-				errorf("PANIC: %s\n%s", err, stack)
+func getRouterRecovery(context *gin.Context) {
+	defer func() {
+		if err := recover(); err != nil {
+			stack := getStack(3)
+			errorf("PANIC: %s\n%s", err, stack)
 
-				return
-			}
-		}()
+			return
+		}
+	}()
 
-		context.Next()
-	}
+	context.Next()
 }
 
-func getRouterLogger() gin.HandlerFunc {
-	return func(context *gin.Context) {
-		start := time.Now()
+func getRouterLogger(context *gin.Context) {
+	start := time.Now()
 
-		// Process request
-		context.Next()
+	// Process request
+	context.Next()
 
-		duration := time.Now().Sub(start)
+	duration := time.Now().Sub(start)
 
-		infof(
-			`%s %s %s %v %v`,
-			context.ClientIP(),
-			context.Request.Method,
-			context.Request.RequestURI,
-			context.Writer.Status(),
-			duration,
-		)
-	}
+	infof(
+		`%s %s %s %v %v`,
+		context.ClientIP(),
+		context.Request.Method,
+		context.Request.RequestURI,
+		context.Writer.Status(),
+		duration,
+	)
 }
 
 func getStack(skip int) string {

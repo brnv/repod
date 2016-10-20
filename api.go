@@ -14,7 +14,7 @@ import (
 
 type API struct {
 	root        string
-	nucleusAuth bool
+	authEnabled bool
 }
 
 type APIResponse struct {
@@ -25,7 +25,7 @@ type APIResponse struct {
 }
 
 func (api *API) readRequestParams(context *gin.Context) {
-	tracef("getting repository")
+	debugf("getting repository")
 
 	var (
 		path     = context.Query("path")
@@ -36,21 +36,21 @@ func (api *API) readRequestParams(context *gin.Context) {
 		err error
 	)
 
-	if len(path) == 0 {
+	if path == "" {
 		return
 	}
 
-	if len(system) == 0 {
+	if system == "" {
 		system = getRepositorySystem(path)
 	}
 
-	debugf("path: %s, system: %s", path, system)
+	tracef("path: %s, system: %s", path, system)
 
 	repository, err := getRepository(api.root, path, system)
 	if err != nil {
 		response.Error = ser.Errorf(err, "can't get repository").Error()
 		context.AbortWithError(http.StatusInternalServerError, err)
-		sendResponse(context)
+		sendResponse(response, context)
 		return
 	}
 
@@ -60,11 +60,11 @@ func (api *API) readRequestParams(context *gin.Context) {
 			"repository is not detected",
 		).Error()
 		context.AbortWithError(http.StatusNotFound, err)
-		sendResponse(context)
+		sendResponse(response, context)
 		return
 	}
 
-	debugf("repository: %s", repository)
+	tracef("repository: %s", repository)
 
 	context.Set("repository", repository)
 
@@ -75,7 +75,7 @@ func (api *API) readRequestParams(context *gin.Context) {
 }
 
 func (api *API) handleListRepositories(context *gin.Context) {
-	tracef("listing repositories")
+	debugf("listing repositories")
 
 	response := context.MustGet("response").(*APIResponse)
 
@@ -86,7 +86,7 @@ func (api *API) handleListRepositories(context *gin.Context) {
 
 	response.Data = repositories
 
-	sendResponse(context)
+	sendResponse(response, context)
 }
 
 func (api *API) handleListPackages(context *gin.Context) {
@@ -97,20 +97,20 @@ func (api *API) handleListPackages(context *gin.Context) {
 		err error
 	)
 
-	tracef("listing packages")
+	debugf("listing packages")
 
 	packages, err := repository.ListPackages()
 	if err != nil {
 		response.Error = ser.Errorf(err, "can't list packages").Error()
 	}
 
-	debugf("packages: %#v", packages)
+	tracef("packages: %#v", packages)
 
 	if len(packages) > 0 {
 		response.Data = strings.Join(packages, "\n")
 	}
 
-	sendResponse(context)
+	sendResponse(response, context)
 }
 
 func (api *API) handleAddPackage(context *gin.Context) {
@@ -123,7 +123,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 		err      error
 	)
 
-	tracef("saving user submitted file")
+	debugf("saving user submitted file")
 
 	filename, err = api.saveRequestFile(repository, context.Request)
 	if err != nil {
@@ -134,7 +134,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 	}
 
 	if len(filename) > 0 {
-		tracef("adding package")
+		debugf("adding package")
 
 		err = repository.AddPackage(filename, forceAdd)
 		if err != nil {
@@ -147,7 +147,7 @@ func (api *API) handleAddPackage(context *gin.Context) {
 
 	response.message = "package added"
 
-	sendResponse(context)
+	sendResponse(response, context)
 }
 
 func (api *API) handleRemovePackage(context *gin.Context) {
@@ -159,9 +159,9 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 		err error
 	)
 
-	tracef("removing package")
+	debugf("removing package")
 
-	debugf("package name: %s", packageName)
+	tracef("package name: %s", packageName)
 
 	err = repository.RemovePackage(packageName)
 	if err != nil {
@@ -170,7 +170,7 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 
 	response.message = "package removed"
 
-	sendResponse(context)
+	sendResponse(response, context)
 }
 
 func (api *API) handleCopyPackage(context *gin.Context) {
@@ -189,7 +189,7 @@ func (api *API) handleCopyPackage(context *gin.Context) {
 
 	response.message = "package copied"
 
-	sendResponse(context)
+	sendResponse(response, context)
 }
 
 func (api *API) handleDescribePackage(context *gin.Context) {
@@ -199,26 +199,26 @@ func (api *API) handleDescribePackage(context *gin.Context) {
 		packageName = context.Param("name")
 	)
 
-	tracef("describing package")
+	debugf("describing package")
 
 	description, err := repository.DescribePackage(packageName)
 	if err != nil {
 		response.Error = ser.Errorf(err, "can't describe package").Error()
 	}
 
-	debugf("description: %s", description)
+	tracef("description: %s", description)
 
 	response.Data = description
 
-	sendResponse(context)
+	sendResponse(response, context)
 }
 
 func (api *API) handleAuthentificate(context *gin.Context) {
-	if !api.nucleusAuth {
+	if !api.authEnabled {
 		return
 	}
 
-	tracef("handle basic authorization")
+	debugf("handle basic authorization")
 
 	username, token, ok := context.Request.BasicAuth()
 	if !ok {
@@ -226,7 +226,7 @@ func (api *API) handleAuthentificate(context *gin.Context) {
 		return
 	}
 
-	tracef("nucleus authentication")
+	debugf("nucleus authentication")
 
 	user, err := nucleus.Authenticate(token)
 	if err != nil {
@@ -252,14 +252,14 @@ func (api *API) handleAuthentificate(context *gin.Context) {
 func (api *API) saveRequestFile(
 	repository Repository, request *http.Request,
 ) (string, error) {
-	tracef("getting form file")
+	debugf("getting form file")
 
 	formfile, header, err := request.FormFile("package_file")
 	if err != nil {
 		return "", ser.Errorf(err, "can't read form file")
 	}
 
-	tracef("copying file to repository")
+	debugf("copying file to repository")
 
 	pathCopied, err := repository.CreatePackageFile(
 		path.Base(header.Filename),
@@ -269,7 +269,7 @@ func (api *API) saveRequestFile(
 		return "", ser.Errorf(err, "can't copy file to repo")
 	}
 
-	debugf("saved file: %s", pathCopied)
+	tracef("saved file: %s", pathCopied)
 
 	return pathCopied, nil
 }
@@ -278,14 +278,12 @@ func (api *API) prepareResponse(context *gin.Context) {
 	context.Set("response", &APIResponse{})
 }
 
-func sendResponse(context *gin.Context) {
-	response := context.MustGet("response").(*APIResponse)
-
+func sendResponse(response *APIResponse, context *gin.Context) {
 	if response.Data == nil && len(response.Error) == 0 {
 		response.Data = response.message
 	}
 
-	debugf("response: %#v", response)
+	tracef("response: %#v", response)
 
 	err := toml.NewEncoder(context.Writer).Encode(response)
 	if err != nil {
