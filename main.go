@@ -23,7 +23,7 @@ Usage:
     repod [options] --listen <address> [--nucleus <address> --tls-cert <path>]
     repod [options] -Q [<path>]
     repod [options] -A <path> -f <path> [--force]
-    repod [options] (-C|-S|-R) <path> <package>
+    repod [options] (-C|-S|-R) <path> <package> [<package_version>]
 
 Options:
     -d --root <path>        Repositories directory [default: /srv/http].
@@ -40,8 +40,10 @@ Options:
     -Q --query              List packages and repositories.
       <path>                Target repository path.
       <package>             Target package to manipulate with.
+      <package_version>     Target package version.
     -s --system <type>      Specify repository system [default: autodetect]
     --debug                 Show runtime debug information.
+    --trace                 Show runtime trace information.
     -h --help               Show this help.
 `
 
@@ -54,8 +56,9 @@ func main() {
 		root    = args["--root"].(string)
 		path, _ = args["<path>"].(string)
 
-		packageName, _ = args["<package>"].(string)
-		packagePath, _ = args["--file"].(string)
+		packageName, _    = args["<package>"].(string)
+		packageVersion, _ = args["<package_version>"].(string)
+		packagePath, _    = args["--file"].(string)
 
 		forceAdd, _ = args["--force"].(bool)
 
@@ -74,6 +77,10 @@ func main() {
 
 	if args["--debug"].(bool) {
 		logger.SetLevel(lorg.LevelDebug)
+	}
+
+	if args["--trace"].(bool) {
+		logger.SetLevel(lorg.LevelTrace)
 	}
 
 	if listenAddress != "" {
@@ -119,10 +126,10 @@ func main() {
 		output, err = repository.DescribePackage(packageName)
 
 	case args["--copy"].(bool):
-		err = repository.CopyPackage(packageName, pathNew)
+		err = repository.CopyPackage(packageName, packageVersion, pathNew)
 
 	case args["--remove"].(bool):
-		err = repository.RemovePackage(packageName)
+		err = repository.RemovePackage(packageName, packageVersion)
 
 	}
 

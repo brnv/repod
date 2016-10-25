@@ -10,8 +10,9 @@ tests:clone tests/mocks/nucleus-server .
 _repod="127.0.0.1:64444"
 _nucleus="127.0.0.1:64777"
 
-export package_ver=$RANDOM
-export package_rel=$RANDOM
+export package_ver="$RANDOM"
+export package_rel="$RANDOM"
+export package_version="${package_ver}-${package_rel}"
 
 api_url="$_repod/v1"
 
@@ -40,14 +41,14 @@ fi
         --root=$(tests:get-tmp-dir)/repositories/ \
         --nucleus "$_nucleus" \
         --tls-cert $(tests:get-tmp-dir)/nucleus/tls.crt \
-        --debug
+        --trace
 }
 
 :run-local() {
     tests:eval go-test:run \
         repod.test \
         --root=$(tests:get-tmp-dir)/repositories/ "${@}" \
-        --debug
+        --trace
 }
 
 :bootstrap-repository() {
@@ -132,9 +133,10 @@ fi
     shift 2
 
     if [[ $mode == "cli" ]]; then
-        :run-local --remove $path $package
+        :run-local --remove $path $package $package_version
     else
-        :curl -XDELETE $api_url/package/$package?path=$path\&system=archlinux
+        :curl -XDELETE \
+            $api_url/package/$package?path=$path\&system=archlinux\&package_version=$package_version
     fi
 }
 
@@ -183,10 +185,10 @@ fi
     shift 3
 
     if [[ $mode == "cli" ]]; then
-        :run-local --copy $path $package \
+        :run-local --copy $path $package $package_version\
             --copy-to $new_root
     else
         :curl -XPOST \
-            $api_url/package/$package?path=$path\&system=archlinux\&copy-to=$new_root
+            $api_url/package/$package?path=$path\&system=archlinux\&copy-to=$new_root\&package_version=$package_version
     fi
 }

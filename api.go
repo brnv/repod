@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"path"
 	"strings"
@@ -91,23 +92,25 @@ func (api *API) handleListRepositories(context *gin.Context) {
 
 func (api *API) handleListPackages(context *gin.Context) {
 	var (
-		repository = context.MustGet("repository").(Repository)
-		response   = context.MustGet("response").(*APIResponse)
-
-		err error
+		repository, exists = context.Get("repository")
+		response           = context.MustGet("response").(*APIResponse)
 	)
 
-	debugf("listing packages")
+	if !exists {
+		response.Error = errors.New("repository is not defined").Error()
+	} else {
+		debugf("listing packages")
 
-	packages, err := repository.ListPackages()
-	if err != nil {
-		response.Error = ser.Errorf(err, "can't list packages").Error()
-	}
+		packages, err := repository.(Repository).ListPackages()
+		if err != nil {
+			response.Error = ser.Errorf(err, "can't list packages").Error()
+		}
 
-	tracef("packages: %#v", packages)
+		tracef("packages: %#v", packages)
 
-	if len(packages) > 0 {
-		response.Data = strings.Join(packages, "\n")
+		if len(packages) > 0 {
+			response.Data = strings.Join(packages, "\n")
+		}
 	}
 
 	sendResponse(response, context)
@@ -152,20 +155,23 @@ func (api *API) handleAddPackage(context *gin.Context) {
 
 func (api *API) handleRemovePackage(context *gin.Context) {
 	var (
-		repository  = context.MustGet("repository").(Repository)
-		response    = context.MustGet("response").(*APIResponse)
-		packageName = context.Param("name")
+		repository = context.MustGet("repository").(Repository)
+		response   = context.MustGet("response").(*APIResponse)
+
+		name = context.Param("name")
+
+		version = context.Query("version")
 
 		err error
 	)
 
 	debugf("removing package")
 
-	tracef("package name: %s", packageName)
+	tracef("package name: %s", name)
 
-	err = repository.RemovePackage(packageName)
+	err = repository.RemovePackage(name, version)
 	if err != nil {
-		response.Error = ser.Errorf(err, "can't remove package").Error()
+		response.Error = ser.Errorf(err, "can't remove package file").Error()
 	}
 
 	response.message = "package removed"
@@ -179,10 +185,11 @@ func (api *API) handleCopyPackage(context *gin.Context) {
 		response    = context.MustGet("response").(*APIResponse)
 		packageName = context.Param("name")
 
-		pathNew = context.Query("copy-to")
+		packageVersion = context.Query("package_version")
+		pathNew        = context.Query("copy-to")
 	)
 
-	err := repository.CopyPackage(packageName, pathNew)
+	err := repository.CopyPackage(packageName, packageVersion, pathNew)
 	if err != nil {
 		response.Error = ser.Errorf(err, "can't edit package").Error()
 	}

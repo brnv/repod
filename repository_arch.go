@@ -211,7 +211,8 @@ func (arch *RepositoryArch) AddPackage(
 }
 
 func (arch *RepositoryArch) CopyPackage(
-	packageName string,
+	name string,
+	version string,
 	pathNew string,
 ) error {
 	var (
@@ -221,11 +222,11 @@ func (arch *RepositoryArch) CopyPackage(
 
 	debugf("getting package file from repository")
 
-	file, err = arch.GetPackageFile(packageName)
+	file, err = arch.GetPackageFile(name, version)
 	if err != nil {
 		return ser.Errorf(
 			err,
-			"can't get package '%s' from repository", packageName,
+			"can't get package '%s' from repository", name,
 		)
 	}
 
@@ -239,21 +240,24 @@ func (arch *RepositoryArch) CopyPackage(
 	if err != nil {
 		return ser.Errorf(
 			err,
-			"can't copy package %s to path %s", packageName, pathNew,
+			"can't copy package %s to path %s", name, pathNew,
 		)
 	}
 
 	return nil
 }
 
-func (arch RepositoryArch) RemovePackage(packageName string) error {
-	debugf("executing repo-remove")
+func (arch RepositoryArch) RemovePackage(
+	name string, version string,
+) error {
+	args := []string{
+		arch.getDatabaseFilepath(),
+		name,
+	}
+	tracef("executing repo-remove with args: '%v'", args)
 
 	stdout, stderr, err := executil.Run(
-		exec.Command("repo-remove", []string{
-			arch.getDatabaseFilepath(),
-			packageName,
-		}...),
+		exec.Command("repo-remove", args...),
 	)
 	if err != nil {
 		return ser.Errorf(err, "can't execute repo-remove")
@@ -264,11 +268,11 @@ func (arch RepositoryArch) RemovePackage(packageName string) error {
 
 	debugf("getting package file from repository")
 
-	file, err := arch.GetPackageFile(packageName)
+	file, err := arch.GetPackageFile(name, version)
 	if err != nil {
 		return ser.Errorf(
 			err,
-			"can't get file for package %s", packageName,
+			"can't get file for package %s", name,
 		)
 	}
 
@@ -402,6 +406,13 @@ func (arch *RepositoryArch) getSyncDirectory() (string, error) {
 	debugf("symlinking database file to sync directory")
 
 	databaseFile := arch.getDatabaseFilepath()
+	if _, err = os.Stat(databaseFile); os.IsNotExist(err) {
+		return "", ser.Errorf(
+			err,
+			"can't stat database file: '%s'",
+			databaseFile,
+		)
+	}
 
 	databaseFileSync := filepath.Join(
 		directorySync,
@@ -427,14 +438,12 @@ func (arch *RepositoryArch) getSyncDirectory() (string, error) {
 }
 
 func (arch *RepositoryArch) GetPackageFile(
-	packageName string,
+	name string,
+	version string,
 ) (*os.File, error) {
-	debugf("finding package file in package dir")
+	tracef("finding package '%s' in package dir", name)
 
-	glob := fmt.Sprintf(
-		"%s-[0-9]*-[0-9]*-*.pkg.tar.xz",
-		packageName,
-	)
+	glob := fmt.Sprintf("%s-%s-*.pkg.tar.xz", name, version)
 
 	tracef("pattern: %s", glob)
 

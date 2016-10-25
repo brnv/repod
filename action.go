@@ -9,7 +9,7 @@ import (
 )
 
 func listRepositories(root string) ([]string, error) {
-	debugf("reading root directory")
+	debugf("reading root directory: '%s'", root)
 
 	items, err := ioutil.ReadDir(root)
 	if err != nil {
@@ -21,6 +21,10 @@ func listRepositories(root string) ([]string, error) {
 
 	repositories := []string{}
 	for _, repository := range items {
+		if !repository.IsDir() {
+			continue
+		}
+
 		repositories = append(repositories, repository.Name())
 	}
 

@@ -10,11 +10,11 @@ import (
 type Repository interface {
 	ListPackages() ([]string, error)
 	AddPackage(packagePath string, force bool) error
-	CopyPackage(packageName string, pathNew string) error
-	CreatePackageFile(packageName string, file io.Reader) (string, error)
-	RemovePackage(packageName string) error
-	DescribePackage(packageName string) (string, error)
-	GetPackageFile(packageName string) (*os.File, error)
+	CopyPackage(name string, version string, pathNew string) error
+	CreatePackageFile(name string, file io.Reader) (string, error)
+	RemovePackage(name string, version string) error
+	DescribePackage(name string) (string, error)
+	GetPackageFile(name string, version string) (*os.File, error)
 }
 
 func getRepositorySystem(path string) string {

@@ -1,6 +1,6 @@
 pkgname="${PKGNAME:-}"
-pkgver=$package_ver
-pkgrel=$package_rel
+pkgver=${package_ver}
+pkgrel=${package_rel}
 pkgdesc=${PKGDESC:-"This is test package description"}
 arch=('x86_64')
 license=('GPL')
