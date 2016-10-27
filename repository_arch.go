@@ -215,6 +215,10 @@ func (arch *RepositoryArch) CopyPackage(
 	version string,
 	pathNew string,
 ) error {
+	if version == "" {
+		return errors.New("package version is not defined")
+	}
+
 	var (
 		file *os.File
 		err  error
@@ -250,10 +254,22 @@ func (arch *RepositoryArch) CopyPackage(
 func (arch RepositoryArch) RemovePackage(
 	name string, version string,
 ) error {
-	args := []string{
-		arch.getDatabaseFilepath(),
-		name,
+	if version == "" {
+		return errors.New("package version is not defined")
 	}
+
+	debugf("getting package file from repository")
+
+	file, err := arch.GetPackageFile(name, version)
+	if err != nil {
+		return ser.Errorf(
+			err,
+			"can't get file for package %s", name,
+		)
+	}
+
+	args := []string{arch.getDatabaseFilepath(), name}
+
 	tracef("executing repo-remove with args: '%v'", args)
 
 	stdout, stderr, err := executil.Run(
@@ -265,16 +281,6 @@ func (arch RepositoryArch) RemovePackage(
 
 	tracef("repo-remove stdout: %s", stdout)
 	tracef("repo-remove stderr: %s", stderr)
-
-	debugf("getting package file from repository")
-
-	file, err := arch.GetPackageFile(name, version)
-	if err != nil {
-		return ser.Errorf(
-			err,
-			"can't get file for package %s", name,
-		)
-	}
 
 	debugf("removing file")
 
@@ -443,9 +449,9 @@ func (arch *RepositoryArch) GetPackageFile(
 ) (*os.File, error) {
 	tracef("finding package '%s' in package dir", name)
 
-	glob := fmt.Sprintf("%s-%s-*.pkg.tar.xz", name, version)
+	glob := fmt.Sprintf("%s-%s-[a-z0-9_]*.pkg.tar.xz", name, version)
 
-	tracef("pattern: %s", glob)
+	tracef("package file search pattern: %s", glob)
 
 	files, err := filepath.Glob(
 		filepath.Join(arch.getPackagesPath(), glob),

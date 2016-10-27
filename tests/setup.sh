@@ -136,7 +136,7 @@ fi
         :run-local --remove $path $package $package_version
     else
         :curl -XDELETE \
-            $api_url/package/$package?path=$path\&system=archlinux\&package_version=$package_version
+            $api_url/package/$package?path=$path\&system=archlinux\&package-version=$package_version
     fi
 }
 
@@ -189,6 +189,6 @@ fi
             --copy-to $new_root
     else
         :curl -XPOST \
-            $api_url/package/$package?path=$path\&system=archlinux\&copy-to=$new_root\&package_version=$package_version
+            $api_url/package/$package?path=$path\&system=archlinux\&copy-to=$new_root\&package-version=$package_version
     fi
 }

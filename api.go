@@ -162,67 +162,88 @@ func (api *API) handleAddPackage(context *gin.Context) {
 
 func (api *API) handleRemovePackage(context *gin.Context) {
 	var (
-		repository = context.MustGet("repository").(Repository)
-		response   = context.MustGet("response").(*APIResponse)
+		repository, exists = context.Get("repository")
+		response           = context.MustGet("response").(*APIResponse)
 
 		name = context.Param("name")
 
-		version = context.Query("version")
+		version = context.Query("package-version")
 
 		err error
 	)
 
-	debugf("removing package")
+	if !exists {
+		response.Error = errors.New("repository is not defined").Error()
+	} else {
+		debugf("removing package")
 
-	tracef("package name: %s", name)
+		tracef("package name: %s", name)
 
-	err = repository.RemovePackage(name, version)
-	if err != nil {
-		response.Error = ser.Errorf(err, "can't remove package file").Error()
+		err = repository.(Repository).RemovePackage(name, version)
+		if err != nil {
+			response.Error = ser.Errorf(
+				err,
+				"can't remove package",
+			).Error()
+		}
+
+		response.message = "package removed"
 	}
-
-	response.message = "package removed"
 
 	sendResponse(response, context)
 }
 
 func (api *API) handleCopyPackage(context *gin.Context) {
 	var (
-		repository  = context.MustGet("repository").(Repository)
-		response    = context.MustGet("response").(*APIResponse)
-		packageName = context.Param("name")
+		repository, exists = context.Get("repository")
+		response           = context.MustGet("response").(*APIResponse)
 
-		packageVersion = context.Query("package_version")
+		packageName    = context.Param("name")
+		packageVersion = context.Query("package-version")
 		pathNew        = context.Query("copy-to")
 	)
 
-	err := repository.CopyPackage(packageName, packageVersion, pathNew)
-	if err != nil {
-		response.Error = ser.Errorf(err, "can't edit package").Error()
-	}
+	if !exists {
+		response.Error = errors.New("repository is not defined").Error()
+	} else {
+		err := repository.(Repository).CopyPackage(
+			packageName,
+			packageVersion,
+			pathNew,
+		)
+		if err != nil {
+			response.Error = ser.Errorf(err, "can't copy package").Error()
+		}
 
-	response.message = "package copied"
+		response.message = "package copied"
+	}
 
 	sendResponse(response, context)
 }
 
 func (api *API) handleDescribePackage(context *gin.Context) {
 	var (
-		repository  = context.MustGet("repository").(Repository)
-		response    = context.MustGet("response").(*APIResponse)
-		packageName = context.Param("name")
+		repository, exists = context.Get("repository")
+		response           = context.MustGet("response").(*APIResponse)
+		packageName        = context.Param("name")
 	)
 
-	debugf("describing package")
+	if !exists {
+		response.Error = errors.New("repository is not defined").Error()
+	} else {
+		debugf("describing package")
 
-	description, err := repository.DescribePackage(packageName)
-	if err != nil {
-		response.Error = ser.Errorf(err, "can't describe package").Error()
+		description, err := repository.(Repository).DescribePackage(
+			packageName,
+		)
+		if err != nil {
+			response.Error = ser.Errorf(err, "can't describe package").Error()
+		}
+
+		tracef("description: %s", description)
+
+		response.Data = description
 	}
-
-	tracef("description: %s", description)
-
-	response.Data = description
 
 	sendResponse(response, context)
 }
