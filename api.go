@@ -45,6 +45,11 @@ func (api *API) readRequestParams(context *gin.Context) {
 		system = getRepositorySystem(path)
 	}
 
+	context.Set("force", false)
+	if force == "1" {
+		context.Set("force", true)
+	}
+
 	tracef("path: %s, system: %s", path, system)
 
 	repository, err := getRepository(api.root, path, system)
@@ -69,10 +74,6 @@ func (api *API) readRequestParams(context *gin.Context) {
 
 	context.Set("repository", repository)
 
-	context.Set("force", false)
-	if force == "1" {
-		context.Set("force", true)
-	}
 }
 
 func (api *API) handleListRepositories(context *gin.Context) {
@@ -118,33 +119,39 @@ func (api *API) handleListPackages(context *gin.Context) {
 
 func (api *API) handleAddPackage(context *gin.Context) {
 	var (
-		repository = context.MustGet("repository").(Repository)
-		response   = context.MustGet("response").(*APIResponse)
-		forceAdd   = context.MustGet("force").(bool)
+		repository, exists = context.Get("repository")
+		response           = context.MustGet("response").(*APIResponse)
 
 		filename string
 		err      error
 	)
 
-	debugf("saving user submitted file")
+	if !exists {
+		response.Error = errors.New("repository is not defined").Error()
+	} else {
+		debugf("saving user submitted file")
 
-	filename, err = api.saveRequestFile(repository, context.Request)
-	if err != nil {
-		response.Error = ser.Errorf(
-			err,
-			"can't save file from request",
-		).Error()
-	}
-
-	if len(filename) > 0 {
-		debugf("adding package")
-
-		err = repository.AddPackage(filename, forceAdd)
+		filename, err = api.saveRequestFile(
+			repository.(Repository),
+			context.Request,
+		)
 		if err != nil {
 			response.Error = ser.Errorf(
 				err,
-				`can't add package`,
+				"can't save file from request",
 			).Error()
+		}
+	}
+
+	if filename != "" {
+		debugf("adding package")
+
+		err = repository.(Repository).AddPackage(
+			filename,
+			context.MustGet("force").(bool),
+		)
+		if err != nil {
+			response.Error = ser.Errorf(err, `can't add package`).Error()
 		}
 	}
 
