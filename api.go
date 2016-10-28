@@ -167,7 +167,7 @@ func (api *API) handleRemovePackage(context *gin.Context) {
 
 		name = context.Param("name")
 
-		version = context.Query("package-version")
+		version = context.Query("version")
 
 		err error
 	)
@@ -199,7 +199,7 @@ func (api *API) handleCopyPackage(context *gin.Context) {
 		response           = context.MustGet("response").(*APIResponse)
 
 		packageName    = context.Param("name")
-		packageVersion = context.Query("package-version")
+		packageVersion = context.Query("version")
 		pathNew        = context.Query("copy-to")
 	)
 
@@ -210,6 +210,7 @@ func (api *API) handleCopyPackage(context *gin.Context) {
 			packageName,
 			packageVersion,
 			pathNew,
+			context.MustGet("force").(bool),
 		)
 		if err != nil {
 			response.Error = ser.Errorf(err, "can't copy package").Error()

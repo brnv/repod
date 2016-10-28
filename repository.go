@@ -10,7 +10,7 @@ import (
 type Repository interface {
 	ListPackages() ([]string, error)
 	AddPackage(packagePath string, force bool) error
-	CopyPackage(name string, version string, pathNew string) error
+	CopyPackage(name string, version string, pathNew string, force bool) error
 	CreatePackageFile(name string, file io.Reader) (string, error)
 	RemovePackage(name string, version string) error
 	DescribePackage(name string) (string, error)

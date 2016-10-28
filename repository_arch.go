@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -214,6 +215,7 @@ func (arch *RepositoryArch) CopyPackage(
 	name string,
 	version string,
 	pathNew string,
+	force bool,
 ) error {
 	if version == "" {
 		return errors.New("package version is not defined")
@@ -234,13 +236,21 @@ func (arch *RepositoryArch) CopyPackage(
 		)
 	}
 
-	debugf("changing target repository path")
+	tracef("changing target repository path to '%s", pathNew)
 
 	arch.SetPath(pathNew)
 
 	debugf("copying package file")
 
-	err = arch.AddPackage(file.Name(), true)
+	pathCopied, err := arch.CreatePackageFile(
+		path.Base(file.Name()),
+		file,
+	)
+	if err != nil {
+		return ser.Errorf(err, "can't copy file to repo")
+	}
+
+	err = arch.AddPackage(pathCopied, force)
 	if err != nil {
 		return ser.Errorf(
 			err,

@@ -60,7 +60,7 @@ func main() {
 		packageVersion, _ = args["<package_version>"].(string)
 		packagePath, _    = args["--file"].(string)
 
-		forceAdd, _ = args["--force"].(bool)
+		force, _ = args["--force"].(bool)
 
 		pathNew, _ = args["--copy-to"].(string)
 
@@ -120,13 +120,18 @@ func main() {
 		}
 
 	case args["--add"].(bool):
-		err = addPackage(repository, packagePath, forceAdd)
+		err = addPackage(repository, packagePath, force)
 
 	case args["--show"].(bool):
 		output, err = repository.DescribePackage(packageName)
 
 	case args["--copy"].(bool):
-		err = repository.CopyPackage(packageName, packageVersion, pathNew)
+		err = repository.CopyPackage(
+			packageName,
+			packageVersion,
+			pathNew,
+			force,
+		)
 
 	case args["--remove"].(bool):
 		err = repository.RemovePackage(packageName, packageVersion)
