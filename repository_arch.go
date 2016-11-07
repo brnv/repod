@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kovetskiy/executil"
+	executil "github.com/reconquest/executil-go"
 	"github.com/reconquest/ser-go"
 )
 
