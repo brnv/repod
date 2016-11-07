@@ -1,3 +1,6 @@
 [submodule "vendor/github.com/reconquest/import.bash"]
 	path = vendor/github.com/reconquest/import.bash
 	url = https://github.com/reconquest/import.bash
+[submodule "vendor/git.rn/devops/nucleus-go"]
+	path = vendor/git.rn/devops/nucleus-go
+	url = git@git.rn:devops/nucleus-go
