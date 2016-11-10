@@ -2,7 +2,7 @@
 Description=repository management service
 
 [Service]
-ExecStart=/usr/bin/repod
+ExecStart=/usr/bin/repod --listen ":4441"
 Restart=always
 RestartSec=10s
 
