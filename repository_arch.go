@@ -221,6 +221,10 @@ func (arch *RepositoryArch) CopyPackage(
 		return errors.New("package version is not defined")
 	}
 
+	if pathNew == "" {
+		return errors.New("new repository path is not defined")
+	}
+
 	var (
 		file *os.File
 		err  error
